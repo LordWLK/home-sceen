@@ -40,7 +40,7 @@ function parisParts(d) {
 }
 function jourCle(d) { const p = parisParts(d); return p.year + p.month + p.day; }
 
-// libellé relatif : "ce soir", "demain 18 h", "sam 14 h"…
+// libellé relatif : "ce soir", "demain 18 h", "sam 14 h", "dim 9 août"…
 function quandLabel(d, allDay) {
   const p = parisParts(d);
   const aujourdhui = jourCle(new Date());
@@ -52,8 +52,13 @@ function quandLabel(d, allDay) {
     return parseInt(p.hour, 10) >= 18 ? 'ce soir · ' + heure : "aujourd'hui · " + heure;
   }
   if (cle === demain) return allDay ? 'demain' : 'demain · ' + heure;
-  const j = p.weekday.replace('.', '');
-  return allDay ? j + ' ' + p.day : j + ' ' + p.day + ' · ' + heure;
+  let jour = p.weekday.replace('.', '') + ' ' + p.day;
+  if (d.getTime() - Date.now() > 6 * 86400000) {
+    // au-delà d'une semaine, le mois lève l'ambiguïté (ufc, matchs lointains)
+    jour = new Intl.DateTimeFormat('fr-FR', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' })
+      .format(d).replace(/\./g, '');
+  }
+  return allDay ? jour : jour + ' · ' + heure;
 }
 
 function esc(s) {
@@ -118,7 +123,8 @@ async function majAgenda() {
 }
 
 /* ============================================================
-   sport · football-data.org si clé fournie, sinon events.json manuel
+   sport · trois sources mélangées puis triées par date :
+   foot (football-data.org, clé), nba et ufc (espn public, sans clé)
    ============================================================ */
 async function fdFetch(chemin) {
   const r = await fetch('https://api.football-data.org/v4' + chemin, {
@@ -126,33 +132,110 @@ async function fdFetch(chemin) {
   });
   return r.json();
 }
-const STAGES_FR = {
-  FINAL: 'finale', SEMI_FINALS: 'demi-finale', THIRD_PLACE: 'petite finale',
-  QUARTER_FINALS: 'quart de finale', LAST_16: 'huitième',
-};
-async function majSport() {
-  const items = [];
-  if (CFG.footballDataKey) {
-    // prochain match de coupe du monde (s'éteint tout seul après la compétition)
+async function espnJson(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('espn ' + r.status);
+  return r.json();
+}
+function sansAccents(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+// prochain match de chaque équipe de foot suivie (losc, milan, liverpool, france…)
+async function footCandidats() {
+  const out = [];
+  if (!CFG.footballDataKey || !Array.isArray(CFG.equipesFoot)) return out;
+  for (const eq of CFG.equipesFoot) {
     try {
-      const wc = await fdFetch('/competitions/WC/matches?status=SCHEDULED');
-      const m = wc.matches && wc.matches[0];
-      if (m) {
-        const nom = (STAGES_FR[m.stage] || 'match') +
-          (m.homeTeam.tla ? ' · ' + m.homeTeam.tla + '-' + m.awayTeam.tla : '');
-        items.push(item(nom, quandLabel(new Date(m.utcDate), false)));
-      }
-    } catch (e) { /* silencieux, on garde la place pour le losc */ }
-    // prochain match du losc
-    try {
-      const lo = await fdFetch('/teams/' + CFG.loscTeamId + '/matches?status=SCHEDULED&limit=2');
-      const m = lo.matches && lo.matches[0];
-      if (m) {
-        const adv = m.homeTeam.id === CFG.loscTeamId ? m.awayTeam.shortName : m.homeTeam.shortName;
-        items.push(item('losc · ' + adv, quandLabel(new Date(m.utcDate), false)));
-      }
-    } catch (e) { /* idem */ }
+      const j = await fdFetch('/teams/' + eq.id + '/matches?status=SCHEDULED&limit=1');
+      const m = j.matches && j.matches[0];
+      if (!m) continue;
+      const adv = m.homeTeam.id === eq.id ? m.awayTeam : m.homeTeam;
+      out.push({
+        date: new Date(m.utcDate),
+        titre: eq.nom + ' · ' + String(adv.shortName || adv.name || adv.tla || '').toLowerCase(),
+      });
+    } catch (e) { /* une équipe en échec ne bloque pas les autres */ }
   }
+  return out;
+}
+
+// prochain match des équipes nba suivies (suns, knicks…)
+async function nbaCandidats() {
+  const out = [];
+  if (!Array.isArray(CFG.nba)) return out;
+  for (const eq of CFG.nba) {
+    try {
+      const j = await espnJson('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/' + eq.espn + '/schedule');
+      const moi = String((j.team && j.team.id) || '');
+      const prochain = (j.events || [])
+        .filter(ev => new Date(ev.date) > new Date())
+        .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+      if (!prochain) continue; // hors saison
+      let adv = '';
+      const comp = prochain.competitions && prochain.competitions[0];
+      if (comp && comp.competitors) {
+        const c = comp.competitors.find(c => String(c.team && c.team.id) !== moi);
+        if (c && c.team) adv = String(c.team.shortDisplayName || c.team.displayName || '').toLowerCase();
+      }
+      out.push({ date: new Date(prochain.date), titre: adv ? eq.nom + ' · ' + adv : eq.nom });
+    } catch (e) { /* espn muet : on passe */ }
+  }
+  return out;
+}
+
+// ufc : les événements numérotés (gros combats) s'affichent toujours,
+// les fight nights seulement si un combattant de CFG.ufcFrancais est à la carte
+async function ufcCandidats() {
+  const out = [];
+  if (!Array.isArray(CFG.ufcFrancais)) return out;
+  const sb = await espnJson('https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard');
+  const cal = (((sb.leagues || [])[0] || {}).calendar) || [];
+  for (const c of cal) {
+    const brut = new Date(c.startDate || c);
+    if (isNaN(brut) || brut < new Date(Date.now() - 12 * 3600000) ||
+        brut > new Date(Date.now() + 35 * 86400000)) continue;
+    const label = String(c.label || '');
+    const ppv = label.match(/^(UFC\s+\d+)/i);
+    // carte du jour : date réelle de l'événement et détection d'un français suivi
+    let date = brut, allDay = true, francais = '';
+    try {
+      const ymd = brut.toISOString().slice(0, 10).replace(/-/g, '');
+      const jour = await espnJson('https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates=' + ymd);
+      (jour.events || []).forEach(ev => {
+        if (ev.date) { date = new Date(ev.date); allDay = false; }
+        (ev.competitions || []).forEach(co => {
+          (co.competitors || []).forEach(a => {
+            const nom = sansAccents((a.athlete && a.athlete.displayName) || '').toLowerCase();
+            const hit = CFG.ufcFrancais.find(f => nom.indexOf(sansAccents(f).toLowerCase()) !== -1);
+            if (hit && !francais) francais = hit;
+          });
+        });
+      });
+    } catch (e) { /* on garde la date du calendrier, sans heure */ }
+    if (!ppv && !francais) continue;
+    let titre;
+    if (ppv && francais) {
+      titre = ppv[1].toLowerCase() + ' · ' + francais;
+    } else if (ppv) {
+      const tete = sansAccents(label.split(':')[1] || '').trim().toLowerCase()
+        .replace(/\s+vs\.?\s+/, '-').replace(/\./g, '');
+      titre = tete ? ppv[1].toLowerCase() + ' · ' + tete : ppv[1].toLowerCase();
+    } else {
+      titre = 'ufc · ' + francais;
+    }
+    out.push({ date: date, titre: titre, allDay: allDay });
+  }
+  return out;
+}
+
+async function majSport() {
+  const cands = [];
+  for (const source of [footCandidats, nbaCandidats, ufcCandidats]) {
+    try { cands.push.apply(cands, await source()); } catch (e) { /* source muette */ }
+  }
+  cands.sort((a, b) => a.date - b.date);
+  const items = cands.slice(0, 4).map(c => item(c.titre, quandLabel(c.date, !!c.allDay)));
   if (!items.length) {
     // repli : petit fichier édité à la main
     try {

@@ -7,7 +7,19 @@
   "meteo": { "lat": 50.63, "lon": 3.06 },
 
   "footballDataKey": "",
-  "loscTeamId": 521,
+  "equipesFoot": [
+    { "id": 521, "nom": "losc" },
+    { "id": 98, "nom": "milan" },
+    { "id": 64, "nom": "liverpool" },
+    { "id": 773, "nom": "france" }
+  ],
+
+  "nba": [
+    { "espn": "phx", "nom": "suns" },
+    { "espn": "ny", "nom": "knicks" }
+  ],
+
+  "ufcFrancais": ["gane", "saint denis", "imavov", "fiorot", "ziam", "gomis", "charriere", "lapilus"],
 
   "statsUrl": "https://TON-SITE.netlify.app/.netlify/functions/stats",
 

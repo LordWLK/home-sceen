@@ -52,7 +52,7 @@ Un seul process Node (`server.js`), une seule dépendance (`node-ical`).
 
 - **Météo** : Open-Meteo, gratuit sans clé, codes météo mappés en libellés FR
 - **Agenda** : calendrier iCloud publié (URL ICS `webcal://` → `https://`), récurrences gérées par node-ical (`rrule.between`), 4 prochains événements sur 7 jours, libellés relatifs ("ce soir", "demain 18 h")
-- **Sport** : football-data.org v4 si `footballDataKey` renseignée (compétitions WC et FL1 dans l'offre gratuite, LOSC = team id 521 **à vérifier une fois**), sinon repli sur `events.json` édité à la main
+- **Sport** : trois sources mélangées puis triées par date, 4 échéances max. Foot via football-data.org v4 si `footballDataKey` renseignée (équipes dans `equipesFoot` : 521 losc, 98 milan, 64 liverpool, 773 france, **ids à vérifier une fois** ; amicaux et sélections hors tournois absents de l'offre gratuite). NBA (`nba` : phx suns, ny knicks) et UFC via l'API publique ESPN sans clé (événements numérotés toujours affichés, fight nights seulement si un nom de `ufcFrancais` est à la carte, comparaison sans accents). Repli global sur `events.json` édité à la main
 - **Studio** : endpoint Netlify du media kit yum.ines (`statsUrl`), lecture tolérante des champs dans `majStudio()` **à adapter au JSON réel**
 - **Spotify** : Web API, compte Premium requis. Refresh token obtenu une fois via `auth-spotify.js` lancé sur le PC (redirect URI imposée `http://127.0.0.1:8888/callback`, Spotify exige HTTPS ou loopback). Pas d'API Jam publique : on contrôle la lecture du compte hôte, ce qui revient au même à la maison.
 
@@ -65,7 +65,7 @@ Reste à faire (avec l'utilisateur) :
 1. `cp config.example.json config.json` et tout remplir
 2. URL ICS du calendrier iCloud partagé (à rendre public depuis l'app Calendrier)
 3. App Spotify + `node auth-spotify.js ID SECRET` sur le PC → refreshToken
-4. Optionnel : clé football-data.org, vérifier `loscTeamId`
+4. Clé football-data.org, vérifier les ids de `equipesFoot` (521/98/64/773) et les abréviations ESPN de `nba`
 5. `statsUrl` + adapter les 2 lignes de `majStudio()` au format réel
 6. Déploiement VPS : `npm install`, service systemd (unité fournie dans le README), ouvrir le port dans le pare-feu Hostinger
 7. iPad : ouvrir l'URL, "Sur l'écran d'accueil", verrouillage auto jamais, luminosité auto off, accès guidé

@@ -35,11 +35,26 @@ node auth-spotify.js TON_CLIENT_ID TON_CLIENT_SECRET
 
 Compte Premium requis pour le contrôle de lecture.
 
-## 4 · sport (optionnel)
+## 4 · sport
 
-Clé gratuite sur football-data.org, à coller dans `footballDataKey`. La Coupe du monde et la Ligue 1 sont dans l'offre gratuite. `loscTeamId` vaut 521, à vérifier une fois avec un appel sur `/v4/teams/521` (ça doit répondre Lille OSC).
+Trois sources, mélangées puis triées par date (les 4 prochaines échéances s'affichent dans l'arche centrale) :
 
-Sans clé, le serveur affiche le contenu de `events.json`, à éditer à la main.
+- **foot** (losc, milan, liverpool, équipe de france) : clé gratuite sur football-data.org à coller dans `footballDataKey`. Les équipes suivies sont dans `equipesFoot` (id football-data + nom affiché). Vérifier les ids une fois :
+
+```bash
+curl -H "X-Auth-Token: TA_CLE" https://api.football-data.org/v4/teams/521   # Lille OSC
+curl -H "X-Auth-Token: TA_CLE" https://api.football-data.org/v4/teams/98    # AC Milan
+curl -H "X-Auth-Token: TA_CLE" https://api.football-data.org/v4/teams/64    # Liverpool FC
+curl -H "X-Auth-Token: TA_CLE" https://api.football-data.org/v4/teams/773   # France
+```
+
+  Limite de l'offre gratuite : pas de matchs amicaux, et l'équipe de France n'apparaît que pendant les grands tournois (euro, coupe du monde).
+
+- **nba** (suns, knicks) : api publique espn, sans clé. `nba` liste les équipes suivies (abréviation espn + nom affiché). Hors saison, la source se tait toute seule.
+
+- **ufc** : api publique espn, sans clé. Les événements numérotés (UFC 324…) s'affichent toujours ; les fight nights seulement si un combattant de `ufcFrancais` est à la carte. Noms en minuscules et sans accents, la liste est libre (par défaut : gane, saint denis, imavov, fiorot, ziam, gomis, charriere, lapilus).
+
+Si aucune source ne répond, le serveur affiche le contenu de `events.json`, à éditer à la main.
 
 ## 5 · stats yum.ines
 
