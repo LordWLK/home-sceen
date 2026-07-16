@@ -6,8 +6,8 @@ Un seul process Node sur le VPS : il récupère météo, agenda, sport et stats 
 
 ```bash
 node -v        # il faut node 18 ou plus
-mkdir -p ~/ecran-maison && cd ~/ecran-maison
-# copier les fichiers du projet ici (scp ou git), puis :
+git clone https://github.com/LordWLK/home-sceen.git ~/ecran-maison
+cd ~/ecran-maison
 npm install
 cp config.example.json config.json
 ```
