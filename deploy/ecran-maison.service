@@ -1,0 +1,13 @@
+[Unit]
+Description=ecran maison
+After=network-online.target
+
+[Service]
+# adapter si le projet n'est pas dans /root/ecran-maison (et le chemin de node : `which node`)
+WorkingDirectory=/root/ecran-maison
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -58,21 +58,10 @@ Test depuis un navigateur : la page doit s'afficher avec la vraie météo.
 
 ## 7 · lancement automatique (systemd)
 
+L'unité est fournie dans `deploy/ecran-maison.service` :
+
 ```bash
-sudo tee /etc/systemd/system/ecran-maison.service << 'EOF'
-[Unit]
-Description=ecran maison
-After=network-online.target
-
-[Service]
-WorkingDirectory=/root/ecran-maison
-ExecStart=/usr/bin/node server.js
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
+sudo cp deploy/ecran-maison.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now ecran-maison
 ```
