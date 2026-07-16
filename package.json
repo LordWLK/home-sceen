@@ -1,0 +1,7 @@
+{
+  "name": "ecran-maison",
+  "private": true,
+  "description": "écran mural ipad 3 · serveur de données et page arcades",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "node-ical": "^0.20.1" }
+}

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1024, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<!-- rechargement complet toutes les 10 min ; la musique, elle, se met à jour en xhr toutes les 30 s -->
+<meta http-equiv="refresh" content="600">
+<title>la maison</title>
+<style>
+  /* écran maison · arcades · cible ipad 3, safari ios 9, 1024 x 768 */
+  * { margin:0; padding:0; -webkit-box-sizing:border-box; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    background:#3a3835;
+    font-family:"Avenir Next", "Avenir", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+
+  #fit { position:absolute; top:0; left:0; }
+  #stage {
+    width:1024px; height:768px;
+    position:relative; overflow:hidden;
+    background:#f6f1e8; color:#35342d;
+    -webkit-transform-origin:top left; transform-origin:top left;
+  }
+
+  /* ---------- tête ---------- */
+  .head {
+    position:absolute; top:52px; left:64px;
+    font-size:14px; font-weight:600; letter-spacing:.4em;
+    text-transform:uppercase; color:#a2947c;
+  }
+  .meteo {
+    position:absolute; top:52px; right:64px; text-align:right;
+    font-size:14px; font-weight:600; letter-spacing:.26em;
+    text-transform:uppercase; color:#7c7361;
+  }
+  .meteo b { color:#b96f45; font-weight:600; }
+
+  /* ---------- horloge ---------- */
+  .clock {
+    position:absolute; left:64px; top:126px;
+    font-family:"Optima", "Avenir Next", sans-serif;
+    font-size:124px; font-weight:500; line-height:1;
+    color:#33322b; letter-spacing:.01em;
+  }
+  .date {
+    position:absolute; left:68px; top:270px;
+    font-family:Georgia, serif; font-style:italic;
+    font-size:27px; color:#7c7361;
+  }
+
+  /* ---------- musique ---------- */
+  .music {
+    position:absolute; top:118px; right:64px;
+    width:430px; height:118px;
+    background:#35342d; color:#efe9dc;
+    border-radius:59px;
+    display:-webkit-flex; display:flex;
+    -webkit-align-items:center; align-items:center;
+    padding:0 18px 0 14px;
+  }
+  .music.off { display:none; }
+  .vinyl {
+    width:90px; height:90px; border-radius:50%;
+    background:#26251f; border:1px solid #4a483e;
+    position:relative; overflow:hidden;
+  }
+  .vinyl:before {
+    content:''; position:absolute; left:50%; top:50%;
+    width:58px; height:58px; margin:-29px 0 0 -29px;
+    border-radius:50%; border:1px solid #4a483e;
+  }
+  .vinyl:after {
+    content:''; position:absolute; left:50%; top:50%;
+    width:26px; height:26px; margin:-13px 0 0 -13px;
+    border-radius:50%; background:#b96f45;
+  }
+  #m-art {
+    position:absolute; left:-1px; top:-1px;
+    width:90px; height:90px; border-radius:50%;
+    display:none; z-index:2;
+  }
+  .mtxt { -webkit-flex:1; flex:1; padding:0 16px; overflow:hidden; }
+  .mtxt .t {
+    font-size:19px; font-weight:600;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .mtxt .a {
+    font-size:11.5px; font-weight:600; letter-spacing:.22em;
+    text-transform:uppercase; opacity:.7; margin-top:5px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .mbtn {
+    display:block; width:64px; height:64px; border-radius:50%;
+    border:1px solid #5a574a; margin-left:10px;
+    position:relative; text-decoration:none;
+  }
+  .mbtn:active { background:#4a483e; }
+  .ic-pause:before, .ic-pause:after {
+    content:''; position:absolute; top:22px; width:6px; height:20px;
+    background:#efe9dc; border-radius:2px;
+  }
+  .ic-pause:before { left:24px; }
+  .ic-pause:after { left:34px; }
+  .ic-next:before {
+    content:''; position:absolute; left:22px; top:22px;
+    border-style:solid; border-width:10px 0 10px 14px;
+    border-color:transparent transparent transparent #efe9dc;
+  }
+  .ic-next:after {
+    content:''; position:absolute; left:40px; top:22px;
+    width:4px; height:20px; background:#efe9dc; border-radius:2px;
+  }
+
+  /* ---------- arcades ---------- */
+  .arches {
+    position:absolute; left:64px; right:64px; bottom:0;
+    display:-webkit-flex; display:flex;
+    -webkit-justify-content:space-between; justify-content:space-between;
+    -webkit-align-items:flex-end; align-items:flex-end;
+  }
+  .arch {
+    width:280px; height:388px;
+    border-radius:140px 140px 0 0;
+    padding:96px 34px 0;
+    text-align:center;
+  }
+  .arch.centre { height:428px; padding-top:120px; }
+  .arch.olive { background:#75815f; color:#f4f0e4; }
+  .arch.sable { background:#e5d5bd; color:#4a463c; }
+  .arch.terra { background:#b96f45; color:#f6f1e8; }
+  .arch h3 {
+    font-family:Georgia, serif; font-style:italic; font-weight:normal;
+    font-size:24px; margin-bottom:18px;
+  }
+  .arch .it { padding:8px 0; font-size:18px; font-weight:600; line-height:1.3; }
+  .arch .it small {
+    display:block; font-size:11.5px; font-weight:600;
+    letter-spacing:.22em; text-transform:uppercase;
+    opacity:.85; margin-top:4px;
+  }
+
+  /* ---------- mode nuit (21 h à 7 h) ---------- */
+  .nuit #stage { background:#2e2d28; color:#d8d2c4; }
+  .nuit .head { color:#8a7f6b; }
+  .nuit .meteo { color:#9b917d; }
+  .nuit .meteo b { color:#c98b60; }
+  .nuit .clock { color:#e8e2d3; }
+  .nuit .date { color:#9b917d; }
+  .nuit .arch.olive { background:#525c43; color:#ddd8c9; }
+  .nuit .arch.sable { background:#a8977a; color:#2e2d28; }
+  .nuit .arch.terra { background:#96593a; color:#e8ddd1; }
+  .nuit .music { background:#26251f; border:1px solid #46443a; color:#d8d2c4; }
+  .nuit .vinyl { background:#1c1b17; }
+  .nuit .vinyl:after { background:#c98b60; }
+</style>
+</head>
+<body>
+<div id="fit">
+  <div id="stage">
+
+    <div class="head">la maison · lille</div>
+
+    <div class="meteo" id="meteo">{{METEO}}</div>
+
+    <div class="music {{MUSIC_CLASS}}" id="music">
+      <div class="vinyl">
+        <img id="m-art" alt="" onload="this.style.display='block'" onerror="this.style.display='none'">
+      </div>
+      <div class="mtxt">
+        <div class="t" id="m-title">{{MUSIC_TITLE}}</div>
+        <div class="a" id="m-artist">{{MUSIC_ARTIST}}</div>
+      </div>
+      <a href="#" class="mbtn ic-pause" onclick="return cmd('pause')" aria-label="lecture ou pause"></a>
+      <a href="#" class="mbtn ic-next" onclick="return cmd('suivant')" aria-label="suivant"></a>
+    </div>
+
+    <div class="clock" id="clock">--:--</div>
+    <div class="date" id="date">&nbsp;</div>
+
+    <div class="arches">
+      <div class="arch olive">
+        <h3>aujourd'hui</h3>
+        {{AGENDA_ITEMS}}
+      </div>
+      <div class="arch sable centre">
+        <h3>à suivre</h3>
+        {{SPORT_ITEMS}}
+      </div>
+      <div class="arch terra">
+        <h3>studio</h3>
+        {{STUDIO_ITEMS}}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  /* es5 uniquement · safari ios 9 · toutes les urls sont relatives
+     (la page est servie sous le chemin secret, avec barre oblique finale) */
+
+  // mise à l'échelle : 1:1 sur l'ipad, réduit proprement ailleurs
+  function fit() {
+    var s = Math.min(window.innerWidth / 1024, window.innerHeight / 768);
+    if (s > 1) { s = 1; }
+    var st = document.getElementById('stage');
+    st.style.webkitTransform = 'scale(' + s + ')';
+    st.style.transform = 'scale(' + s + ')';
+    var f = document.getElementById('fit');
+    f.style.width = (1024 * s) + 'px';
+    f.style.height = (768 * s) + 'px';
+    f.style.left = Math.max(0, (window.innerWidth - 1024 * s) / 2) + 'px';
+    f.style.top = Math.max(0, (window.innerHeight - 768 * s) / 2) + 'px';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  // horloge, date, bascule jour / nuit
+  var JOURS = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  var MOIS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function tick() {
+    var d = new Date();
+    document.getElementById('clock').innerHTML = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    document.getElementById('date').innerHTML =
+      JOURS[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()];
+    var h = d.getHours();
+    var nuit = (h >= 21 || h < 7);
+    document.body.className = nuit ? 'nuit' : '';
+  }
+  tick();
+  setInterval(tick, 10000);
+
+  // musique : commandes et rafraîchissement léger sans recharger la page
+  var dernierTitre = '';
+  function texte(id, v) { document.getElementById(id).innerHTML = v.replace(/</g, '&lt;'); }
+
+  function appliquerMusique(d) {
+    var m = document.getElementById('music');
+    if (!d.playing) { m.className = 'music off'; return; }
+    m.className = 'music';
+    texte('m-title', d.title || '');
+    texte('m-artist', d.artist || '');
+    if (d.title !== dernierTitre) {
+      dernierTitre = d.title;
+      var img = document.getElementById('m-art');
+      img.style.display = 'none';
+      img.src = 'musique/pochette?' + (new Date()).getTime();
+    }
+  }
+  function pollMusique() {
+    try {
+      var x = new XMLHttpRequest();
+      x.open('GET', 'musique/etat', true);
+      x.onreadystatechange = function () {
+        if (x.readyState === 4 && x.status === 200) {
+          try { appliquerMusique(JSON.parse(x.responseText)); } catch (e) {}
+        }
+      };
+      x.send();
+    } catch (e) {}
+  }
+  function cmd(action) {
+    try {
+      var x = new XMLHttpRequest();
+      x.open('GET', 'musique/' + action, true);
+      x.send();
+    } catch (e) {}
+    setTimeout(pollMusique, 1200);
+    return false;
+  }
+  setTimeout(pollMusique, 1000);
+  setInterval(pollMusique, 30000);
+</script>
+</body>
+</html>

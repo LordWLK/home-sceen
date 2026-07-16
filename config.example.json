@@ -1,0 +1,19 @@
+{
+  "port": 8017,
+  "basePath": "/maison-x7k2p",
+
+  "icsUrl": "https://pXX-caldav.icloud.com/published/2/COLLER_ICI_L_URL_PUBLIQUE",
+
+  "meteo": { "lat": 50.63, "lon": 3.06 },
+
+  "footballDataKey": "",
+  "loscTeamId": 521,
+
+  "statsUrl": "https://TON-SITE.netlify.app/.netlify/functions/stats",
+
+  "spotify": {
+    "clientId": "",
+    "clientSecret": "",
+    "refreshToken": ""
+  }
+}
