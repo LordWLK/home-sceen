@@ -251,6 +251,7 @@ async function majSport() {
    >>> adapter les deux lignes de lecture au format réel du json <<<
    ============================================================ */
 async function majStudio() {
+  if (!CFG.statsUrl) return; // pas encore branché : silence, l'arche reste sobre
   const r = await fetch(CFG.statsUrl);
   const j = await r.json();
   const abonnes = j.followers || j.abonnes || (j.instagram && j.instagram.followers);
