@@ -275,7 +275,8 @@
   function pollMusique() {
     try {
       var x = new XMLHttpRequest();
-      x.open('GET', 'musique/etat', true);
+      // horodatage anti-cache : safari ios 9 recycle les xhr get sinon
+      x.open('GET', 'musique/etat?' + (new Date()).getTime(), true);
       x.onreadystatechange = function () {
         if (x.readyState === 4 && x.status === 200) {
           try { appliquerMusique(JSON.parse(x.responseText)); } catch (e) {}
@@ -295,6 +296,10 @@
   }
   setTimeout(pollMusique, 1000);
   setInterval(pollMusique, 30000);
+
+  // filet de sécurité : en mode plein écran ios 9, le meta refresh est
+  // parfois capricieux ; on force aussi le rechargement complet en js
+  setTimeout(function () { window.location.reload(true); }, 600000);
 </script>
 </body>
 </html>

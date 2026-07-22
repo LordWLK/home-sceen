@@ -356,7 +356,11 @@ function page() {
    serveur http · tout vit sous le chemin secret CFG.basePath
    ============================================================ */
 function json(res, obj) {
-  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+  // no-store indispensable : safari ios 9 met en cache les xhr get sinon
+  res.writeHead(200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
   res.end(JSON.stringify(obj));
 }
 const serveur = http.createServer(async (req, res) => {
@@ -371,7 +375,10 @@ const serveur = http.createServer(async (req, res) => {
 
   try {
     if (route === '' || route === '/') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store', // le rechargement des 10 min doit repartir du serveur
+      });
       res.end(page());
 
     } else if (route === '/musique/etat') {
