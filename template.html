@@ -116,6 +116,14 @@
     content:''; position:absolute; left:40px; top:22px;
     width:4px; height:20px; background:#efe9dc; border-radius:2px;
   }
+  /* en pause : la capsule reste visible, tamisée, et le bouton devient lecture */
+  .music.paused .vinyl, .music.paused .mtxt { opacity:.55; }
+  .music.paused .ic-pause:before {
+    left:26px; top:20px; width:0; height:0; background:none;
+    border-style:solid; border-width:12px 0 12px 18px;
+    border-color:transparent transparent transparent #efe9dc;
+  }
+  .music.paused .ic-pause:after { display:none; }
 
   /* ---------- arcades ---------- */
   .arches {
@@ -185,7 +193,7 @@
 
     <div class="arches">
       <div class="arch olive">
-        <h3>aujourd'hui</h3>
+        <h3>agenda</h3>
         {{AGENDA_ITEMS}}
       </div>
       <div class="arch sable centre">
@@ -193,7 +201,7 @@
         {{SPORT_ITEMS}}
       </div>
       <div class="arch terra">
-        <h3>studio</h3>
+        <h3>yum.ines</h3>
         {{STUDIO_ITEMS}}
       </div>
     </div>
@@ -243,8 +251,10 @@
 
   function appliquerMusique(d) {
     var m = document.getElementById('music');
-    if (!d.playing) { m.className = 'music off'; return; }
-    m.className = 'music';
+    // capsule masquée seulement quand rien n'est chargé ;
+    // en pause elle reste visible avec un bouton lecture
+    if (!d.title) { m.className = 'music off'; return; }
+    m.className = d.playing ? 'music' : 'music paused';
     texte('m-title', d.title || '');
     texte('m-artist', d.artist || '');
     if (d.title !== dernierTitre) {

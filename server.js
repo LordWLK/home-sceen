@@ -296,7 +296,11 @@ async function spFetch(chemin, methode) {
 async function majMusique() {
   try {
     const r = await spFetch('/me/player/currently-playing');
-    if (r.status === 204) { musique.playing = false; return; }
+    if (r.status === 204) {
+      // plus de session active : on efface tout, la capsule se masque
+      musique.playing = false; musique.title = ''; musique.artist = '';
+      return;
+    }
     const j = await r.json();
     musique.playing = !!j.is_playing;
     if (j.item) {
@@ -312,7 +316,7 @@ async function majMusique() {
         musique.artUrl = url;
       }
     }
-  } catch (e) { musique.playing = false; }
+  } catch (e) { musique.playing = false; musique.title = ''; musique.artist = ''; }
 }
 
 /* ============================================================
@@ -324,7 +328,7 @@ function page() {
     .replace('{{AGENDA_ITEMS}}', donnees.agenda.html)
     .replace('{{SPORT_ITEMS}}', donnees.sport.html)
     .replace('{{STUDIO_ITEMS}}', donnees.studio.html)
-    .replace('{{MUSIC_CLASS}}', musique.playing ? '' : 'off')
+    .replace('{{MUSIC_CLASS}}', musique.title ? (musique.playing ? '' : 'paused') : 'off')
     .replace('{{MUSIC_TITLE}}', esc(musique.title))
     .replace('{{MUSIC_ARTIST}}', esc(musique.artist));
 }

@@ -24,9 +24,9 @@ Côté serveur en revanche : Node ≥ 18 moderne, `fetch` natif, async/await, to
 DA « arcades », retenue après 3 rondes d'exploration (sombre → clair calme → vert/orange → découpage → 5 variations). Esprit papiers découpés façon Matisse, calme et classe.
 
 - Fond ivoire `#f6f1e8`, encre `#35342d`
-- Trois arches en bas : olive `#75815f` (aujourd'hui), sable `#e5d5bd` (à suivre, arche centrale plus haute), terracotta `#b96f45` (studio)
+- Trois arches en bas : olive `#75815f` (agenda), sable `#e5d5bd` (à suivre, arche centrale plus haute), terracotta `#b96f45` (yum.ines)
 - Horloge Optima en haut à gauche, date Georgia italique dessous, météo en haut à droite
-- Capsule musique d'encre en haut à droite (vinyle CSS remplacé par la pochette quand elle charge), masquée via la classe `off` quand rien ne joue
+- Capsule musique d'encre en haut à droite (vinyle CSS remplacé par la pochette quand elle charge) : en pause elle reste visible tamisée (classe `paused`, bouton lecture) ; masquée via la classe `off` seulement quand plus rien n'est chargé (le serveur vide le titre sur 204/erreur)
 - **Mode nuit automatique 21 h → 7 h** (classe `nuit` sur body, palettes assombries définies dans le CSS)
 - Typo : titres d'arches en Georgia italique, labels en petites capitales espacées, capitalisation française (pas de Title Case), pas de tirets cadratins dans les textes
 
@@ -73,7 +73,6 @@ Reste à faire (avec l'utilisateur) :
 ## backlog d'idées (non engagé)
 
 - Boutons volume dans la capsule musique (endpoints `/musique/volume/+` et `/-`)
-- Pochette avec coin "en pause" quand `playing=false` au lieu de masquer
 - Rotation de contenus dans l'arche centrale selon l'heure (matin : agenda, soir : sport)
 - Classement MPP "La Fricadelle Compétition" pendant les compétitions
 
