@@ -6,8 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="format-detection" content="telephone=no">
-<!-- rechargement complet toutes les 10 min ; la musique, elle, se met à jour en xhr toutes les 30 s -->
-<meta http-equiv="refresh" content="600">
+<!-- le contenu se rafraîchit en xhr (musique 10 s, zones 60 s) ;
+     rechargement complet toutes les 30 min par simple hygiène -->
+<meta http-equiv="refresh" content="1800">
 <title>la maison</title>
 <style>
   /* écran maison · arcades · cible ipad 3, safari ios 9, 1024 x 768 */
@@ -200,17 +201,17 @@
     <div class="arches">
       <div class="arch olive">
         <h3>aujourd'hui</h3>
-        {{AGENDA_AUJ}}
+        <div id="z-auj">{{AGENDA_AUJ}}</div>
         <div class="entete2">à venir</div>
-        {{AGENDA_VENIR}}
+        <div id="z-venir">{{AGENDA_VENIR}}</div>
       </div>
       <div class="arch sable centre">
         <h3>sport</h3>
-        {{SPORT_ITEMS}}
+        <div id="z-sport">{{SPORT_ITEMS}}</div>
       </div>
       <div class="arch terra">
         <h3>yum.ines</h3>
-        {{STUDIO_ITEMS}}
+        <div id="z-studio">{{STUDIO_ITEMS}}</div>
       </div>
     </div>
 
@@ -251,7 +252,7 @@
     document.body.className = nuit ? 'nuit' : '';
   }
   tick();
-  setInterval(tick, 10000);
+  setInterval(tick, 1000);
 
   // musique : commandes et rafraîchissement léger sans recharger la page
   var dernierTitre = '';
@@ -291,15 +292,38 @@
       x.open('GET', 'musique/' + action, true);
       x.send();
     } catch (e) {}
-    setTimeout(pollMusique, 1200);
+    setTimeout(pollMusique, 600);
     return false;
   }
-  setTimeout(pollMusique, 1000);
-  setInterval(pollMusique, 30000);
+  // zones de contenu (météo, agenda, sport, studio) sans recharger la page
+  function pollContenu() {
+    try {
+      var x = new XMLHttpRequest();
+      x.open('GET', 'contenu?' + (new Date()).getTime(), true);
+      x.onreadystatechange = function () {
+        if (x.readyState === 4 && x.status === 200) {
+          try {
+            var d = JSON.parse(x.responseText);
+            document.getElementById('meteo').innerHTML = d.meteo;
+            document.getElementById('z-auj').innerHTML = d.agendaAuj;
+            document.getElementById('z-venir').innerHTML = d.agendaVenir;
+            document.getElementById('z-sport').innerHTML = d.sport;
+            document.getElementById('z-studio').innerHTML = d.studio;
+          } catch (e) {}
+        }
+      };
+      x.send();
+    } catch (e) {}
+  }
+
+  setTimeout(pollMusique, 500);
+  setInterval(pollMusique, 2000);
+  setTimeout(pollContenu, 2000);
+  setInterval(pollContenu, 60000);
 
   // filet de sécurité : en mode plein écran ios 9, le meta refresh est
   // parfois capricieux ; on force aussi le rechargement complet en js
-  setTimeout(function () { window.location.reload(true); }, 600000);
+  setTimeout(function () { window.location.reload(true); }, 1800000);
 </script>
 </body>
 </html>

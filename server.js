@@ -311,14 +311,18 @@ async function spFetch(chemin, methode) {
     headers: { 'Authorization': 'Bearer ' + t },
   });
 }
+let musiqueEchecs = 0; // à 2 s de cadence, on ne masque pas la capsule au premier raté
 async function majMusique() {
   try {
     const r = await spFetch('/me/player/currently-playing');
     if (r.status === 204) {
       // plus de session active : on efface tout, la capsule se masque
+      musiqueEchecs = 0;
       musique.playing = false; musique.title = ''; musique.artist = '';
       return;
     }
+    if (!r.ok) throw new Error('spotify ' + r.status);
+    musiqueEchecs = 0;
     const j = await r.json();
     musique.playing = !!j.is_playing;
     if (j.item) {
@@ -334,7 +338,13 @@ async function majMusique() {
         musique.artUrl = url;
       }
     }
-  } catch (e) { musique.playing = false; musique.title = ''; musique.artist = ''; }
+  } catch (e) {
+    // on garde le dernier état affiché pendant ~20 s d'échecs (429, réseau…)
+    musiqueEchecs++;
+    if (musiqueEchecs >= 10) {
+      musique.playing = false; musique.title = ''; musique.artist = '';
+    }
+  }
 }
 
 /* ============================================================
@@ -384,6 +394,16 @@ const serveur = http.createServer(async (req, res) => {
     } else if (route === '/musique/etat') {
       json(res, { playing: musique.playing, title: musique.title, artist: musique.artist });
 
+    } else if (route === '/contenu') {
+      // toutes les zones de la page, pour rafraîchir sans recharger
+      json(res, {
+        meteo: donnees.meteo.html,
+        agendaAuj: donnees.agenda.auj,
+        agendaVenir: donnees.agenda.venir,
+        sport: donnees.sport.html,
+        studio: donnees.studio.html,
+      });
+
     } else if (route === '/musique/pause') {
       await spFetch(musique.playing ? '/me/player/pause' : '/me/player/play', 'PUT');
       setTimeout(majMusique, 800);
@@ -416,8 +436,8 @@ async function rafraichirTout() {
 }
 rafraichirTout();
 majMusique();
-setInterval(rafraichirTout, 5 * 60 * 1000);   // données : toutes les 5 min
-setInterval(majMusique, 30 * 1000);           // spotify : toutes les 30 s
+setInterval(rafraichirTout, 2 * 60 * 1000);   // données : toutes les 2 min
+setInterval(majMusique, 2 * 1000);            // spotify : toutes les 2 s
 
 serveur.listen(CFG.port, () => {
   console.log('écran maison prêt : http://<ip-du-vps>:' + CFG.port + CFG.basePath + '/');
