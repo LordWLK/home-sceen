@@ -16,7 +16,10 @@ const TZ = 'Europe/Paris';
 /* ---------- état en mémoire ---------- */
 const donnees = {
   meteo: { html: 'météo indisponible' },
-  agenda: { html: '<div class="it">agenda en cours de chargement</div>' },
+  agenda: {
+    auj: '<div class="it">chargement</div>',
+    venir: '<div class="it">chargement</div>',
+  },
   sport: { html: '' },
   studio: { html: '' },
 };
@@ -116,10 +119,25 @@ async function majAgenda() {
     }
   }
   occs.sort((a, b) => a.date - b.date);
-  const quatre = occs.slice(0, 4);
-  donnees.agenda.html = quatre.length
-    ? quatre.map(o => item(o.titre, quandLabel(o.date, o.allDay))).join('\n')
-    : item('rien au programme', 'semaine calme');
+
+  // deux sections dans l'arche : le jour même, puis les jours suivants
+  const cleAuj = jourCle(new Date());
+  const auj = occs.filter(o => jourCle(o.date) === cleAuj).slice(0, 2);
+  const venir = occs.filter(o => jourCle(o.date) !== cleAuj).slice(0, 2);
+
+  donnees.agenda.auj = auj.length
+    ? auj.map(o => item(o.titre, heureLabel(o.date, o.allDay))).join('\n')
+    : item('rien de prévu', 'journée libre');
+  donnees.agenda.venir = venir.length
+    ? venir.map(o => item(o.titre, quandLabel(o.date, o.allDay))).join('\n')
+    : item('semaine calme', 'rien devant');
+}
+
+// libellé court pour la section "aujourd'hui" (la date serait redondante)
+function heureLabel(d, allDay) {
+  if (allDay) return 'toute la journée';
+  const p = parisParts(d);
+  return parseInt(p.hour, 10) + ' h' + (p.minute !== '00' ? ' ' + p.minute : '');
 }
 
 /* ============================================================
@@ -325,7 +343,8 @@ async function majMusique() {
 function page() {
   return TEMPLATE
     .replace('{{METEO}}', donnees.meteo.html)
-    .replace('{{AGENDA_ITEMS}}', donnees.agenda.html)
+    .replace('{{AGENDA_AUJ}}', donnees.agenda.auj)
+    .replace('{{AGENDA_VENIR}}', donnees.agenda.venir)
     .replace('{{SPORT_ITEMS}}', donnees.sport.html)
     .replace('{{STUDIO_ITEMS}}', donnees.studio.html)
     .replace('{{MUSIC_CLASS}}', musique.title ? (musique.playing ? '' : 'paused') : 'off')

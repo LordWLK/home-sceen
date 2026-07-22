@@ -152,6 +152,12 @@
     letter-spacing:.22em; text-transform:uppercase;
     opacity:.85; margin-top:4px;
   }
+  /* intertitre de la section basse de l'arche agenda */
+  .arch .entete2 {
+    margin:14px 0 2px; font-size:11.5px; font-weight:600;
+    letter-spacing:.22em; text-transform:uppercase; opacity:.6;
+  }
+  .arch.olive { padding-top:78px; }
 
   /* ---------- mode nuit (21 h à 7 h) ---------- */
   .nuit #stage { background:#2e2d28; color:#d8d2c4; }
@@ -193,11 +199,13 @@
 
     <div class="arches">
       <div class="arch olive">
-        <h3>agenda</h3>
-        {{AGENDA_ITEMS}}
+        <h3>aujourd'hui</h3>
+        {{AGENDA_AUJ}}
+        <div class="entete2">à venir</div>
+        {{AGENDA_VENIR}}
       </div>
       <div class="arch sable centre">
-        <h3>à suivre</h3>
+        <h3>sport</h3>
         {{SPORT_ITEMS}}
       </div>
       <div class="arch terra">

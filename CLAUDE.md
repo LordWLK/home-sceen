@@ -24,7 +24,7 @@ Côté serveur en revanche : Node ≥ 18 moderne, `fetch` natif, async/await, to
 DA « arcades », retenue après 3 rondes d'exploration (sombre → clair calme → vert/orange → découpage → 5 variations). Esprit papiers découpés façon Matisse, calme et classe.
 
 - Fond ivoire `#f6f1e8`, encre `#35342d`
-- Trois arches en bas : olive `#75815f` (agenda), sable `#e5d5bd` (à suivre, arche centrale plus haute), terracotta `#b96f45` (yum.ines)
+- Trois arches en bas : olive `#75815f` (aujourd'hui + intertitre « à venir », deux sections), sable `#e5d5bd` (sport, arche centrale plus haute), terracotta `#b96f45` (yum.ines)
 - Horloge Optima en haut à gauche, date Georgia italique dessous, météo en haut à droite
 - Capsule musique d'encre en haut à droite (vinyle CSS remplacé par la pochette quand elle charge) : en pause elle reste visible tamisée (classe `paused`, bouton lecture) ; masquée via la classe `off` seulement quand plus rien n'est chargé (le serveur vide le titre sur 204/erreur)
 - **Mode nuit automatique 21 h → 7 h** (classe `nuit` sur body, palettes assombries définies dans le CSS)
@@ -36,7 +36,7 @@ Un seul process Node (`server.js`), une seule dépendance (`node-ical`).
 
 - Cache en mémoire, pas de base de données
 - Données (météo, agenda, sport, studio) rafraîchies toutes les 5 min via `setInterval` ; Spotify toutes les 30 s
-- La page est assemblée à chaque GET depuis `template.html` par remplacement de slots : `{{METEO}}`, `{{AGENDA_ITEMS}}`, `{{SPORT_ITEMS}}`, `{{STUDIO_ITEMS}}`, `{{MUSIC_CLASS}}`, `{{MUSIC_TITLE}}`, `{{MUSIC_ARTIST}}`
+- La page est assemblée à chaque GET depuis `template.html` par remplacement de slots : `{{METEO}}`, `{{AGENDA_AUJ}}`, `{{AGENDA_VENIR}}`, `{{SPORT_ITEMS}}`, `{{STUDIO_ITEMS}}`, `{{MUSIC_CLASS}}`, `{{MUSIC_TITLE}}`, `{{MUSIC_ARTIST}}`
 - Côté iPad : meta refresh complet toutes les 10 min + poll XHR `musique/etat` toutes les 30 s (URLs relatives, d'où la redirection 301 qui force la barre oblique finale sur `basePath`)
 - Fuseau : tout est formaté en `Europe/Paris` via `Intl` côté serveur (le VPS peut être en UTC)
 
@@ -51,7 +51,7 @@ Un seul process Node (`server.js`), une seule dépendance (`node-ical`).
 ### sources de données
 
 - **Météo** : Open-Meteo, gratuit sans clé, codes météo mappés en libellés FR
-- **Agenda** : calendrier iCloud publié (URL ICS `webcal://` → `https://`), récurrences gérées par node-ical (`rrule.between`), 4 prochains événements sur 7 jours, libellés relatifs ("ce soir", "demain 18 h")
+- **Agenda** : calendrier iCloud publié (URL ICS `webcal://` → `https://`), récurrences gérées par node-ical (`rrule.between`), fenêtre de 7 jours coupée en deux sections : « aujourd'hui » (2 max, heure seule) et « à venir » (2 max, libellés relatifs "demain 18 h", "lun 27 · 19 h 30")
 - **Sport** : trois sources mélangées puis triées par date, 4 échéances max. Foot via football-data.org v4 si `footballDataKey` renseignée (équipes dans `equipesFoot` : 521 losc, 98 milan, 64 liverpool, 773 france, **ids à vérifier une fois** ; amicaux et sélections hors tournois absents de l'offre gratuite). NBA (`nba` : phx suns, ny knicks) et UFC via l'API publique ESPN sans clé (événements numérotés toujours affichés, fight nights seulement si un nom de `ufcFrancais` est à la carte, comparaison sans accents). Repli global sur `events.json` édité à la main
 - **Studio** : endpoint Netlify du media kit yum.ines (`statsUrl`), lecture tolérante des champs dans `majStudio()` **à adapter au JSON réel**
 - **Spotify** : Web API, compte Premium requis. Refresh token obtenu une fois via `auth-spotify.js` lancé sur le PC (redirect URI imposée `http://127.0.0.1:8888/callback`, Spotify exige HTTPS ou loopback). Pas d'API Jam publique : on contrôle la lecture du compte hôte, ce qui revient au même à la maison.
