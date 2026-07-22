@@ -276,6 +276,13 @@ async function tokenSpotify() {
   });
   const j = await r.json();
   spotifyAccess = { token: j.access_token, exp: Date.now() + (j.expires_in - 60) * 1000 };
+  if (j.refresh_token && j.refresh_token !== CFG.spotify.refreshToken) {
+    // spotify fait tourner les refresh tokens (durée de vie 180 j en mode development) :
+    // on persiste le nouveau pour ne jamais casser la chaîne
+    CFG.spotify.refreshToken = j.refresh_token;
+    fs.writeFile(path.join(__dirname, 'config.json'), JSON.stringify(CFG, null, 2) + '\n',
+      e => { if (e) console.log('[spotify] échec sauvegarde du refresh token :', e.message); });
+  }
   return spotifyAccess.token;
 }
 async function spFetch(chemin, methode) {
