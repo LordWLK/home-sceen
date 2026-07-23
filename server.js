@@ -369,6 +369,11 @@ async function majCinema() {
         const titre = t[1].trim();
         const f = films[titre] || (films[titre] = { presse: 0, spect: 0, ou: [] });
         if (f.ou.indexOf(cine.nom) === -1) f.ou.push(cine.nom);
+        // année et mention « reprise » pour distinguer nouveautés et classiques
+        const entete = carte.slice(0, 1200);
+        if (/\breprise\b/i.test(entete)) f.reprise = true;
+        const an = entete.match(/\b(19[2-9]\d|20[0-3]\d)\b/);
+        if (an) f.annee = Math.min(f.annee || 9999, parseInt(an[1], 10));
         // pour chaque note, le libellé (presse/spectateurs) est loin derrière,
         // séparé par une rangée d'icônes d'étoiles : on remonte 600 caractères
         // et on prend le dernier libellé rencontré
@@ -386,23 +391,35 @@ async function majCinema() {
     } catch (e) { /* un cinéma muet n'empêche pas les autres */ }
   }
   const notes = n => n.toFixed(1).replace('.', ',');
-  const classement = Object.keys(films)
+  const anneeCourante = new Date().getFullYear();
+  const tous = Object.keys(films)
     .map(titre => {
       const f = films[titre];
       const score = f.presse && f.spect ? (f.presse + f.spect) / 2 : (f.presse || f.spect);
-      return { titre, presse: f.presse, spect: f.spect, ou: f.ou, score };
+      const classique = !!f.reprise || (f.annee && f.annee <= anneeCourante - 2);
+      return { titre, presse: f.presse, spect: f.spect, ou: f.ou, annee: f.annee, classique, score };
     })
     .filter(f => f.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 4);
-  if (!classement.length) throw new Error('aucun film noté trouvé');
-  donnees.cinema.html = classement.map(f => {
+    .sort((a, b) => b.score - a.score);
+  if (!tous.length) throw new Error('aucun film noté trouvé');
+
+  // mix : les 2 meilleures nouveautés + les 2 meilleures reprises,
+  // complété par le meilleur reste si une catégorie manque
+  const nouveautes = tous.filter(f => !f.classique).slice(0, 2);
+  const classiques = tous.filter(f => f.classique).slice(0, 2);
+  let sel = nouveautes.concat(classiques);
+  const reste = tous.filter(f => sel.indexOf(f) === -1);
+  sel = sel.concat(reste.slice(0, 4 - sel.length));
+
+  donnees.cinema.html = sel.map(f => {
     const salles = f.ou.length > 2 ? f.ou.length + ' salles' : f.ou.join(' + ');
+    // l'année d'un classique s'affiche dans le titre, la ligne du bas reste courte
+    const titre = f.titre.toLowerCase() + ((f.classique && f.annee) ? ' · ' + f.annee : '');
     const sous = [salles,
       f.presse ? 'presse ' + notes(f.presse) : '',
       f.spect ? 'spect ' + notes(f.spect) : '']
       .filter(Boolean).join(' · ');
-    return item(f.titre.toLowerCase(), sous);
+    return item(titre, sous);
   }).join('\n');
 }
 

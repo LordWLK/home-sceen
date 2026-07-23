@@ -38,6 +38,9 @@ async function recupererHtml() {
     const n = c.indexOf('stareval-note');
     if (n !== -1) console.log('  contexte note :', JSON.stringify(c.slice(Math.max(0, n - 120), n + 80)));
     else console.log('  aucune stareval-note dans cette carte');
+    const entete = c.slice(0, 1200);
+    console.log('  reprise ?', /\breprise\b/i.test(entete),
+      '· année détectée :', (entete.match(/\b(19[2-9]\d|20[0-3]\d)\b/) || [null, 'aucune'])[1]);
   });
 
   // où vivent les notes si elles ne sont pas dans les cartes ?
