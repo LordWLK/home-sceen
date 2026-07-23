@@ -22,6 +22,7 @@ const donnees = {
   },
   sport: { html: '' },
   studio: { html: '' },
+  cinema: { html: '' },
 };
 const musique = {
   playing: false, title: '', artist: '',
@@ -269,21 +270,73 @@ async function majSport() {
    >>> adapter les deux lignes de lecture au format réel du json <<<
    ============================================================ */
 async function majStudio() {
-  if (!CFG.statsUrl) return; // pas encore branché : silence, l'arche reste sobre
+  if (!CFG.statsUrl) return; // pas encore branché : le pendentif reste masqué
   const r = await fetch(CFG.statsUrl);
   const j = await r.json();
   const abonnes = j.followers || j.abonnes || (j.instagram && j.instagram.followers);
   const delta = j.delta7 || j.weeklyGrowth || (j.instagram && j.instagram.delta7) || 0;
   donnees.studio.html =
-    item(Number(abonnes).toLocaleString('fr-FR'), 'abonnés yum.ines') +
-    item((delta >= 0 ? '+' : '') + delta, 'sur 7 jours');
+    '<div class="p-lbl">yum.ines</div>' +
+    '<div class="p-num">' + esc(Number(abonnes).toLocaleString('fr-FR')) + '</div>' +
+    '<div class="p-lbl">' + esc((delta >= 0 ? '+' : '') + delta + ' sur 7 jours') + '</div>';
+}
+
+/* ============================================================
+   ciné · films à l'affiche les mieux notés dans les cinémas
+   configurés (pages horaires allociné, notes presse + spectateurs)
+   ============================================================ */
+async function majCinema() {
+  if (!Array.isArray(CFG.cinemas) || !CFG.cinemas.length) return;
+  const films = {}; // titre → meilleures notes vues dans les cinémas suivis
+  for (const cine of CFG.cinemas) {
+    try {
+      const r = await fetch('https://www.allocine.fr/seance/salle_gen_csalle=' + cine.allocine + '.html', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+          'Accept-Language': 'fr-FR,fr;q=0.9',
+        },
+      });
+      if (!r.ok) throw new Error('allociné ' + r.status);
+      const html = await r.text();
+      // une "carte" par film sur la page horaires
+      const cartes = html.split(/movie-card-theater|entity-card-list/).slice(1);
+      for (const carte of cartes) {
+        const t = carte.match(/meta-title-link[^>]*>\s*([^<]+?)\s*</);
+        if (!t) continue;
+        const titre = t[1].trim();
+        const presse = carte.match(/Presse[\s\S]{0,300}?stareval-note[^>]*>\s*([\d,.]+)/);
+        const spect = carte.match(/Spectateurs[\s\S]{0,300}?stareval-note[^>]*>\s*([\d,.]+)/);
+        const f = films[titre] || (films[titre] = { presse: 0, spect: 0 });
+        if (presse) f.presse = Math.max(f.presse, parseFloat(presse[1].replace(',', '.')));
+        if (spect) f.spect = Math.max(f.spect, parseFloat(spect[1].replace(',', '.')));
+      }
+    } catch (e) { /* un cinéma muet n'empêche pas les autres */ }
+  }
+  const notes = n => n.toFixed(1).replace('.', ',');
+  const classement = Object.keys(films)
+    .map(titre => {
+      const f = films[titre];
+      const score = f.presse && f.spect ? (f.presse + f.spect) / 2 : (f.presse || f.spect);
+      return { titre, presse: f.presse, spect: f.spect, score };
+    })
+    .filter(f => f.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+  if (!classement.length) throw new Error('aucun film noté trouvé');
+  donnees.cinema.html = classement.map(f => {
+    const sous = [f.presse ? 'presse ' + notes(f.presse) : '', f.spect ? 'spect ' + notes(f.spect) : '']
+      .filter(Boolean).join(' · ');
+    return item(f.titre.toLowerCase(), sous);
+  }).join('\n');
 }
 
 /* ============================================================
    spotify · web api (compte premium), token rafraîchi au besoin
    ============================================================ */
+let tokenBloqueJusqua = 0; // backoff : ne pas marteler accounts.spotify.com à 2 s si ça échoue
 async function tokenSpotify() {
   if (spotifyAccess.token && Date.now() < spotifyAccess.exp) return spotifyAccess.token;
+  if (Date.now() < tokenBloqueJusqua) throw new Error('refresh en attente');
   const basic = Buffer.from(CFG.spotify.clientId + ':' + CFG.spotify.clientSecret).toString('base64');
   const r = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
@@ -294,6 +347,11 @@ async function tokenSpotify() {
     body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(CFG.spotify.refreshToken),
   });
   const j = await r.json();
+  if (!j.access_token) {
+    tokenBloqueJusqua = Date.now() + 60000;
+    console.log('[spotify] refresh du token refusé :', JSON.stringify(j));
+    throw new Error('refresh refusé');
+  }
   spotifyAccess = { token: j.access_token, exp: Date.now() + (j.expires_in - 60) * 1000 };
   if (j.refresh_token && j.refresh_token !== CFG.spotify.refreshToken) {
     // spotify fait tourner les refresh tokens (durée de vie 180 j en mode development) :
@@ -312,9 +370,18 @@ async function spFetch(chemin, methode) {
   });
 }
 let musiqueEchecs = 0; // à 2 s de cadence, on ne masque pas la capsule au premier raté
+let musiquePauseJusqua = 0;
 async function majMusique() {
+  if (Date.now() < musiquePauseJusqua) return;
   try {
     const r = await spFetch('/me/player/currently-playing');
+    if (r.status === 429) {
+      // limite de débit : on respecte le délai demandé par spotify
+      const attente = parseInt(r.headers.get('retry-after') || '10', 10) + 1;
+      musiquePauseJusqua = Date.now() + attente * 1000;
+      console.log('[spotify] limite de débit, pause de', attente, 's');
+      return;
+    }
     if (r.status === 204) {
       // plus de session active : on efface tout, la capsule se masque
       musiqueEchecs = 0;
@@ -339,9 +406,10 @@ async function majMusique() {
       }
     }
   } catch (e) {
-    // on garde le dernier état affiché pendant ~20 s d'échecs (429, réseau…)
+    // on garde le dernier état affiché pendant ~20 s d'échecs (réseau, token…)
     musiqueEchecs++;
-    if (musiqueEchecs >= 10) {
+    if (musiqueEchecs === 10) {
+      console.log('[spotify] injoignable depuis 20 s (' + e.message + '), capsule masquée');
       musique.playing = false; musique.title = ''; musique.artist = '';
     }
   }
@@ -357,6 +425,8 @@ function page() {
     .replace('{{AGENDA_VENIR}}', donnees.agenda.venir)
     .replace('{{SPORT_ITEMS}}', donnees.sport.html)
     .replace('{{STUDIO_ITEMS}}', donnees.studio.html)
+    .replace('{{PEND_CLASS}}', donnees.studio.html ? '' : 'off')
+    .replace('{{CINEMA_ITEMS}}', donnees.cinema.html)
     .replace('{{MUSIC_CLASS}}', musique.title ? (musique.playing ? '' : 'paused') : 'off')
     .replace('{{MUSIC_TITLE}}', esc(musique.title))
     .replace('{{MUSIC_ARTIST}}', esc(musique.artist));
@@ -402,6 +472,7 @@ const serveur = http.createServer(async (req, res) => {
         agendaVenir: donnees.agenda.venir,
         sport: donnees.sport.html,
         studio: donnees.studio.html,
+        cinema: donnees.cinema.html,
       });
 
     } else if (route === '/musique/pause') {
@@ -434,10 +505,16 @@ async function rafraichirTout() {
     if (r.status === 'rejected') console.log('[maj]', noms[i], 'en échec :', r.reason.message);
   });
 }
+function rafraichirCinema() {
+  majCinema().catch(e => console.log('[maj] ciné en échec :', e.message));
+}
+
 rafraichirTout();
 majMusique();
+rafraichirCinema();
 setInterval(rafraichirTout, 2 * 60 * 1000);   // données : toutes les 2 min
 setInterval(majMusique, 2 * 1000);            // spotify : toutes les 2 s
+setInterval(rafraichirCinema, 6 * 3600 * 1000); // affiche ciné : toutes les 6 h
 
 serveur.listen(CFG.port, () => {
   console.log('écran maison prêt : http://<ip-du-vps>:' + CFG.port + CFG.basePath + '/');

@@ -56,9 +56,25 @@ curl -H "X-Auth-Token: TA_CLE" https://api.football-data.org/v4/teams/773   # Fr
 
 Si aucune source ne répond, le serveur affiche le contenu de `events.json`, à éditer à la main.
 
+## 4 bis · ciné (arche terracotta)
+
+L'arche « ciné » affiche les 3 films à l'affiche les mieux notés (moyenne presse + spectateurs AlloCiné) dans les cinémas configurés. Pour chaque cinéma à suivre :
+
+1. Sur allocine.fr, chercher le cinéma et ouvrir sa page horaires : l'URL ressemble à `https://www.allocine.fr/seance/salle_gen_csalle=P0104.html`
+2. Reporter le code (`P0104` dans l'exemple) dans `cinemas` du config.json :
+
+```json
+"cinemas": [
+  { "allocine": "P0104", "nom": "ugc lille" },
+  { "allocine": "XXXX", "nom": "ugc villeneuve d'ascq" }
+]
+```
+
+L'affiche est rafraîchie toutes les 6 h (scraping poli d'allociné ; si la structure de leurs pages change, la source logge `[maj] ciné en échec` et garde son dernier contenu). Liste vide = arche sobre, rien ne casse.
+
 ## 5 · stats yum.ines
 
-Renseigner `statsUrl` avec l'endpoint Netlify du media kit. Si le JSON renvoyé n'a pas des champs `followers` / `delta7`, adapter les deux lignes de lecture dans `majStudio()` (server.js, section studio, c'est commenté).
+Renseigner `statsUrl` avec l'endpoint Netlify du media kit : les stats s'affichent dans le pendentif terracotta en haut de l'écran (masqué tant que `statsUrl` est vide). Si le JSON renvoyé n'a pas des champs `followers` / `delta7`, adapter les deux lignes de lecture dans `majStudio()` (server.js, section studio, c'est commenté).
 
 ## 6 · chemin secret et lancement
 

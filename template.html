@@ -126,6 +126,21 @@
   }
   .music.paused .ic-pause:after { display:none; }
 
+  /* ---------- pendentif yum.ines : petite arche renversée en haut ---------- */
+  .pendentif {
+    position:absolute; top:0; left:50%; width:240px; margin-left:-120px;
+    height:140px; padding-top:32px;
+    background:#b96f45; color:#f6f1e8;
+    border-radius:0 0 120px 120px; text-align:center;
+  }
+  .pendentif.off { display:none; }
+  .pendentif .p-num { font-size:25px; font-weight:600; margin:3px 0 2px; }
+  .pendentif .p-lbl {
+    font-size:10.5px; font-weight:600; letter-spacing:.2em;
+    text-transform:uppercase; opacity:.85;
+  }
+  .nuit .pendentif { background:#96593a; color:#e8ddd1; }
+
   /* ---------- arcades ---------- */
   .arches {
     position:absolute; left:64px; right:64px; bottom:0;
@@ -183,6 +198,8 @@
 
     <div class="meteo" id="meteo">{{METEO}}</div>
 
+    <div class="pendentif {{PEND_CLASS}}" id="z-pend">{{STUDIO_ITEMS}}</div>
+
     <div class="music {{MUSIC_CLASS}}" id="music">
       <div class="vinyl">
         <img id="m-art" alt="" onload="this.style.display='block'" onerror="this.style.display='none'">
@@ -210,8 +227,8 @@
         <div id="z-sport">{{SPORT_ITEMS}}</div>
       </div>
       <div class="arch terra">
-        <h3>yum.ines</h3>
-        <div id="z-studio">{{STUDIO_ITEMS}}</div>
+        <h3>ciné</h3>
+        <div id="z-cinema">{{CINEMA_ITEMS}}</div>
       </div>
     </div>
 
@@ -308,7 +325,10 @@
             document.getElementById('z-auj').innerHTML = d.agendaAuj;
             document.getElementById('z-venir').innerHTML = d.agendaVenir;
             document.getElementById('z-sport').innerHTML = d.sport;
-            document.getElementById('z-studio').innerHTML = d.studio;
+            document.getElementById('z-cinema').innerHTML = d.cinema;
+            var pend = document.getElementById('z-pend');
+            pend.innerHTML = d.studio;
+            pend.className = d.studio ? 'pendentif' : 'pendentif off';
           } catch (e) {}
         }
       };

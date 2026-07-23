@@ -24,7 +24,8 @@ Côté serveur en revanche : Node ≥ 18 moderne, `fetch` natif, async/await, to
 DA « arcades », retenue après 3 rondes d'exploration (sombre → clair calme → vert/orange → découpage → 5 variations). Esprit papiers découpés façon Matisse, calme et classe.
 
 - Fond ivoire `#f6f1e8`, encre `#35342d`
-- Trois arches en bas : olive `#75815f` (aujourd'hui + intertitre « à venir », deux sections), sable `#e5d5bd` (sport, arche centrale plus haute), terracotta `#b96f45` (yum.ines)
+- Trois arches en bas : olive `#75815f` (aujourd'hui + intertitre « à venir », deux sections), sable `#e5d5bd` (sport, arche centrale plus haute), terracotta `#b96f45` (ciné)
+- Pendentif terracotta en haut au centre (petite arche renversée descendant du bord) : stats yum.ines, masqué (`off`) tant que `statsUrl` est vide
 - Horloge Optima en haut à gauche, date Georgia italique dessous, météo en haut à droite
 - Capsule musique d'encre en haut à droite (vinyle CSS remplacé par la pochette quand elle charge) : en pause elle reste visible tamisée (classe `paused`, bouton lecture) ; masquée via la classe `off` seulement quand plus rien n'est chargé (le serveur vide le titre sur 204/erreur)
 - **Mode nuit automatique 21 h → 7 h** (classe `nuit` sur body, palettes assombries définies dans le CSS)
@@ -54,7 +55,8 @@ Un seul process Node (`server.js`), une seule dépendance (`node-ical`).
 - **Météo** : Open-Meteo, gratuit sans clé, codes météo mappés en libellés FR
 - **Agenda** : calendrier iCloud publié (URL ICS `webcal://` → `https://`), récurrences gérées par node-ical (`rrule.between`), fenêtre de 7 jours coupée en deux sections : « aujourd'hui » (2 max, heure seule) et « à venir » (2 max, libellés relatifs "demain 18 h", "lun 27 · 19 h 30")
 - **Sport** : trois sources mélangées puis triées par date, 4 échéances max. Foot via football-data.org v4 si `footballDataKey` renseignée (équipes dans `equipesFoot` : 521 losc, 98 milan, 64 liverpool, 773 france, **ids à vérifier une fois** ; amicaux et sélections hors tournois absents de l'offre gratuite). NBA (`nba` : phx suns, ny knicks) et UFC via l'API publique ESPN sans clé (événements numérotés toujours affichés, fight nights seulement si un nom de `ufcFrancais` est à la carte, comparaison sans accents). Repli global sur `events.json` édité à la main
-- **Studio** : endpoint Netlify du media kit yum.ines (`statsUrl`), lecture tolérante des champs dans `majStudio()` **à adapter au JSON réel**
+- **Studio** : endpoint Netlify du media kit yum.ines (`statsUrl`), lecture tolérante des champs dans `majStudio()` **à adapter au JSON réel** ; s'affiche dans le pendentif
+- **Ciné** : pages horaires AlloCiné des cinémas de `cinemas` (codes `salle_gen_csalle`), extraction regex des notes presse/spectateurs, top 3 par moyenne, rafraîchi toutes les 6 h. Scraping fragile par nature : en cas de changement de structure allociné, `[maj] ciné en échec` et l'arche garde son dernier contenu
 - **Spotify** : Web API, compte Premium requis. Refresh token obtenu une fois via `auth-spotify.js` lancé sur le PC (redirect URI imposée `http://127.0.0.1:8888/callback`, Spotify exige HTTPS ou loopback). Pas d'API Jam publique : on contrôle la lecture du compte hôte, ce qui revient au même à la maison.
 
 ## état d'avancement

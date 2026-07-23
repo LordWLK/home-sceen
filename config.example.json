@@ -23,6 +23,8 @@
 
   "statsUrl": "https://TON-SITE.netlify.app/.netlify/functions/stats",
 
+  "cinemas": [],
+
   "spotify": {
     "clientId": "",
     "clientSecret": "",
