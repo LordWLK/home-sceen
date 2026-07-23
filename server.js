@@ -384,7 +384,9 @@ async function majCinema() {
         // un id allociné très bas (< 20000)
         const mb = carte.indexOf('meta-body');
         if (mb !== -1) {
-          const an = carte.slice(mb, mb + 120).match(/\b(19\d\d|20[0-3]\d)\b/);
+          // la date est nichée dans des div imbriqués : on retire les balises d'abord
+          const txt = carte.slice(mb, mb + 400).replace(/<[^>]+>/g, ' ');
+          const an = txt.match(/\b(19\d\d|20[0-3]\d)\b/);
           if (an) f.annee = Math.min(f.annee || 9999, parseInt(an[1], 10));
         }
         if (/\breprise\b/i.test(carte.slice(0, 1500))) f.reprise = true;
