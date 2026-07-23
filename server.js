@@ -370,16 +370,18 @@ async function majCinema() {
         if (!t || !t[1].trim()) continue;
         const titre = t[1].trim();
         const f = films[titre] || (films[titre] = { presse: 0, spect: 0 });
-        // chaque bloc rating-item contient un label (presse/spectateurs) et une
-        // note stareval-note, dans un ordre qui a déjà changé chez eux : on lit les deux
-        for (const ri of carte.split(/rating-item/).slice(1)) {
-          const bloc = ri.slice(0, 400);
-          const note = bloc.match(/stareval-note[^>]*>\s*([\d,.]+)/);
-          if (!note) continue;
-          const val = parseFloat(note[1].replace(',', '.'));
+        // pour chaque note, le libellé (presse/spectateurs) est loin derrière,
+        // séparé par une rangée d'icônes d'étoiles : on remonte 600 caractères
+        // et on prend le dernier libellé rencontré
+        for (const nm of carte.matchAll(/stareval-note[^>]*>\s*([\d,.]+)/g)) {
+          const val = parseFloat(nm[1].replace(',', '.'));
           if (isNaN(val)) continue;
-          if (/presse/i.test(bloc)) f.presse = Math.max(f.presse, val);
-          else if (/spectateur/i.test(bloc)) f.spect = Math.max(f.spect, val);
+          const avant = carte.slice(Math.max(0, nm.index - 600), nm.index).toLowerCase();
+          const p = avant.lastIndexOf('presse');
+          const s = avant.lastIndexOf('spectateur');
+          if (p === -1 && s === -1) continue;
+          if (p > s) f.presse = Math.max(f.presse, val);
+          else f.spect = Math.max(f.spect, val);
         }
       }
     } catch (e) { /* un cinéma muet n'empêche pas les autres */ }
