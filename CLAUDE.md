@@ -27,8 +27,9 @@ DA « arcades », retenue après 3 rondes d'exploration (sombre → clair calme 
 - Trois arches en bas : olive `#75815f` (aujourd'hui + intertitre « à venir », deux sections), sable `#e5d5bd` (sport, arche centrale plus haute), terracotta `#b96f45` (ciné)
 - Pendentif terracotta en haut au centre (petite arche renversée descendant du bord) : stats yum.ines, masqué (`off`) tant que `statsUrl` est vide
 - Horloge Optima en haut à gauche, date Georgia italique dessous, météo en haut à droite
-- Capsule musique d'encre en haut à droite (vinyle CSS remplacé par la pochette quand elle charge) : en pause elle reste visible tamisée (classe `paused`, bouton lecture) ; masquée via la classe `off` seulement quand plus rien n'est chargé (le serveur vide le titre sur 204/erreur)
-- **Mode nuit automatique 21 h → 7 h** (classe `nuit` sur body, palettes assombries définies dans le CSS)
+- Capsule musique d'encre en haut à droite (vinyle CSS remplacé par la pochette quand elle charge) : en pause elle reste visible tamisée (classe `paused`, bouton lecture) ; masquée via la classe `off` seulement quand plus rien n'est chargé (le serveur vide le titre sur 204/erreur). Fond teinté par la couleur dominante de la pochette (canvas côté client, assombrie ×0.3, aucune dépendance serveur). Boutons volume −/+ en plus de pause/suivant
+- Prochaine échéance de l'agenda mise en évidence (classe `next` : petit point d'accent)
+- **Mode nuit automatique 21 h → 7 h** (classe `nuit` sur body, palettes assombries définies dans le CSS), bascule en fondu (transitions CSS 1 s) ; les zones rafraîchies apparaissent en fondu léger (0,4 s, seulement si le contenu change)
 - Typo : titres d'arches en Georgia italique, labels en petites capitales espacées, capitalisation française (pas de Title Case), pas de tirets cadratins dans les textes
 
 ## architecture
@@ -44,15 +45,17 @@ Un seul process Node (`server.js`), une seule dépendance (`node-ical`).
 ### endpoints (tous sous `basePath`)
 
 - `GET /` page assemblée
-- `GET /contenu` JSON de toutes les zones (météo, agenda auj/venir, sport, studio)
+- `GET /contenu` JSON de toutes les zones (météo, agenda auj/venir, sport, studio, ciné) + `figees` (sources en échec au-delà de leur seuil)
 - `GET /musique/etat` JSON `{playing, title, artist}`
 - `GET /musique/pause` toggle play/pause
 - `GET /musique/suivant` piste suivante
+- `GET /musique/volume/plus` et `/musique/volume/moins` ±10 % (lit le volume de l'appareil actif puis le règle)
 - `GET /musique/pochette` image proxifiée (no-store)
 
 ### sources de données
 
-- **Météo** : Open-Meteo, gratuit sans clé, codes météo mappés en libellés FR
+- **Météo** : Open-Meteo, gratuit sans clé, codes météo mappés en libellés FR. Ligne détail : mini/maxi du jour + prochaine heure pluvieuse (proba ≥ 50 %, heure de Paris)
+- **Santé des sources** : chaque `maj*` horodate sa réussite dans `sante` ; `sourcesFigees()` liste celles dépassant leur seuil (16 min pour météo/agenda/sport, 14 h pour ciné/studio), affichées discrètement en haut à gauche. Initialisées « fraîches » au démarrage
 - **Agenda** : calendrier iCloud publié (URL ICS `webcal://` → `https://`), récurrences gérées par node-ical (`rrule.between`), fenêtre de 7 jours coupée en deux sections : « aujourd'hui » (2 max, heure seule) et « à venir » (2 max, libellés relatifs "demain 18 h", "lun 27 · 19 h 30")
 - **Sport** : trois sources mélangées puis triées par date, 4 échéances max. Foot via football-data.org v4 si `footballDataKey` renseignée (équipes dans `equipesFoot` : 521 losc, 98 milan, 64 liverpool, 773 france, **ids à vérifier une fois** ; amicaux et sélections hors tournois absents de l'offre gratuite). NBA (`nba` : phx suns, ny knicks) et UFC via l'API publique ESPN sans clé (événements numérotés toujours affichés, fight nights seulement si un nom de `ufcFrancais` est à la carte, comparaison sans accents). Repli global sur `events.json` édité à la main
 - **Studio** : abonnés du profil Instagram public de `instagram` (regex `edge_followed_by`/`follower_count`, repli sur le og:description arrondi), historique quotidien local `studio-historique.json` (gitignoré) pour le delta 7 j, rafraîchi toutes les 6 h avec le ciné. `statsUrl` (endpoint dédié) reste prioritaire si renseignée. Instagram peut bloquer les IP de datacenter : en échec, `[maj] studio en échec` et le pendentif garde/masque son contenu
@@ -75,9 +78,9 @@ Reste à faire (avec l'utilisateur) :
 
 ## backlog d'idées (non engagé)
 
-- Boutons volume dans la capsule musique (endpoints `/musique/volume/+` et `/-`)
 - Rotation de contenus dans l'arche centrale selon l'heure (matin : agenda, soir : sport)
 - Classement MPP "La Fricadelle Compétition" pendant les compétitions
+- yum.ines via l'API Graph de Meta (chiffre exact fiable, remplace le scraping bloqué)
 
 ## comment tester sans iPad
 

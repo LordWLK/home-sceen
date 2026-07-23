@@ -30,6 +30,22 @@ const musique = {
 };
 let spotifyAccess = { token: '', exp: 0 };
 
+/* ---------- santé des sources : horodatage de la dernière réussite ----------
+   permet de repérer une source figée (scraper cassé, api muette) sans lire
+   les logs. seuils larges = 8× l'intervalle de rafraîchissement. */
+const sante = { meteo: 0, agenda: 0, sport: 0, cinema: 0, studio: 0 };
+const SEUILS = { // ms au-delà desquels une source est considérée figée
+  meteo: 16 * 60000, agenda: 16 * 60000, sport: 16 * 60000,
+  cinema: 14 * 3600000, studio: 14 * 3600000,
+};
+const NOMS_FR = { meteo: 'météo', agenda: 'agenda', sport: 'sport', cinema: 'ciné', studio: 'studio' };
+function sourcesFigees() {
+  const maintenant = Date.now();
+  return Object.keys(sante)
+    .filter(k => maintenant - sante[k] > SEUILS[k])
+    .map(k => NOMS_FR[k]);
+}
+
 /* ============================================================
    petits utilitaires date (tout en heure de paris)
    ============================================================ */
@@ -80,8 +96,9 @@ function decodeEntites(s) {
     // apostrophes et guillemets typographiques → simples (rendu iOS 9 fiable)
     .replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
 }
-function item(titre, sous) {
-  return '<div class="it">' + esc(titre) + '<small>' + esc(sous) + '</small></div>';
+function item(titre, sous, next) {
+  return '<div class="it' + (next ? ' next' : '') + '">' + esc(titre) +
+    '<small>' + esc(sous) + '</small></div>';
 }
 
 /* ============================================================
@@ -101,12 +118,34 @@ function libelleMeteo(code) {
 }
 async function majMeteo() {
   const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + CFG.meteo.lat +
-    '&longitude=' + CFG.meteo.lon + '&current=temperature_2m,weather_code&timezone=' +
-    encodeURIComponent(TZ);
+    '&longitude=' + CFG.meteo.lon +
+    '&current=temperature_2m,weather_code' +
+    '&daily=temperature_2m_max,temperature_2m_min' +
+    '&hourly=precipitation_probability' +
+    '&forecast_days=1&timezone=' + encodeURIComponent(TZ);
   const r = await fetch(u);
   const j = await r.json();
   const t = Math.round(j.current.temperature_2m);
-  donnees.meteo.html = esc(libelleMeteo(j.current.weather_code)) + ' · <b>' + t + '°</b>';
+  const tmax = Math.round(j.daily.temperature_2m_max[0]);
+  const tmin = Math.round(j.daily.temperature_2m_min[0]);
+
+  // prochaine heure pluvieuse aujourd'hui (proba ≥ 50 %), en heure de paris
+  let pluie = '';
+  if (j.hourly && j.hourly.time) {
+    const n = parisParts(new Date());
+    const cleNow = n.year + '-' + n.month + '-' + n.day + 'T' + n.hour;
+    for (let i = 0; i < j.hourly.time.length; i++) {
+      if (j.hourly.time[i].slice(0, 13) < cleNow) continue;
+      if (j.hourly.precipitation_probability[i] >= 50) {
+        pluie = ' · pluie ' + parseInt(j.hourly.time[i].slice(11, 13), 10) + ' h';
+        break;
+      }
+    }
+  }
+
+  donnees.meteo.html = esc(libelleMeteo(j.current.weather_code)) + ' · <b>' + t + '°</b>' +
+    '<span class="mdetail">' + tmin + '° / ' + tmax + '°' + esc(pluie) + '</span>';
+  sante.meteo = Date.now();
 }
 
 /* ============================================================
@@ -133,17 +172,22 @@ async function majAgenda() {
   }
   occs.sort((a, b) => a.date - b.date);
 
+  // la prochaine échéance à venir est mise en évidence (classe "next")
+  const maintenant = Date.now();
+  const prochaine = occs.find(o => o.date.getTime() >= maintenant);
+
   // deux sections dans l'arche : le jour même, puis les jours suivants
   const cleAuj = jourCle(new Date());
   const auj = occs.filter(o => jourCle(o.date) === cleAuj).slice(0, 2);
   const venir = occs.filter(o => jourCle(o.date) !== cleAuj).slice(0, 2);
 
   donnees.agenda.auj = auj.length
-    ? auj.map(o => item(o.titre, heureLabel(o.date, o.allDay))).join('\n')
+    ? auj.map(o => item(o.titre, heureLabel(o.date, o.allDay), o === prochaine)).join('\n')
     : item('rien de prévu', 'journée libre');
   donnees.agenda.venir = venir.length
-    ? venir.map(o => item(o.titre, quandLabel(o.date, o.allDay))).join('\n')
+    ? venir.map(o => item(o.titre, quandLabel(o.date, o.allDay), o === prochaine)).join('\n')
     : item('semaine calme', 'rien devant');
+  sante.agenda = Date.now();
 }
 
 // libellé court pour la section "aujourd'hui" (la date serait redondante)
@@ -275,6 +319,7 @@ async function majSport() {
     } catch (e) { /* rien */ }
   }
   donnees.sport.html = items.join('\n') || item('pas de match prévu', 'trêve');
+  sante.sport = Date.now();
 }
 
 /* ============================================================
@@ -353,6 +398,7 @@ async function majStudio() {
     '<div class="p-lbl">yum.ines</div>' +
     '<div class="p-num">' + esc(abonnes.toLocaleString('fr-FR')) + '</div>' +
     (delta ? '<div class="p-lbl">' + esc((delta > 0 ? '+' : '') + delta + ' sur 7 jours') + '</div>' : '');
+  sante.studio = Date.now();
 }
 
 /* ============================================================
@@ -438,6 +484,7 @@ async function majCinema() {
       .filter(Boolean).join(' · ');
     return item(f.titre.toLowerCase(), sous);
   }).join('\n');
+  sante.cinema = Date.now();
 }
 
 /* ============================================================
@@ -583,6 +630,7 @@ const serveur = http.createServer(async (req, res) => {
         sport: donnees.sport.html,
         studio: donnees.studio.html,
         cinema: donnees.cinema.html,
+        figees: sourcesFigees(),
       });
 
     } else if (route === '/musique/pause') {
@@ -594,6 +642,17 @@ const serveur = http.createServer(async (req, res) => {
       await spFetch('/me/player/next', 'POST');
       setTimeout(majMusique, 800);
       json(res, { ok: true });
+
+    } else if (route === '/musique/volume/plus' || route === '/musique/volume/moins') {
+      // lit le volume courant de l'appareil actif puis l'ajuste de ±10 %
+      let vol = 50;
+      try {
+        const pr = await spFetch('/me/player');
+        if (pr.ok) { const pj = await pr.json(); if (pj && pj.device) vol = pj.device.volume_percent; }
+      } catch (e) { /* on part de 50 % */ }
+      vol = route.slice(-4) === 'plus' ? Math.min(100, vol + 10) : Math.max(0, vol - 10);
+      await spFetch('/me/player/volume?volume_percent=' + vol, 'PUT');
+      json(res, { ok: true, volume: vol });
 
     } else if (route === '/musique/pochette') {
       if (musique.artBuf) {
@@ -621,6 +680,9 @@ function rafraichirLent() {
   majStudio().catch(e => console.log('[maj] studio en échec :', e.message));
 }
 
+// on part d'un état "frais" : une source n'est figée que si elle rate
+// pendant tout son seuil après le démarrage
+Object.keys(sante).forEach(k => { sante[k] = Date.now(); });
 rafraichirTout();
 majMusique();
 rafraichirLent();

@@ -41,6 +41,23 @@
     text-transform:uppercase; color:#7c7361;
   }
   .meteo b { color:#b96f45; font-weight:600; }
+  .meteo .mdetail {
+    display:block; margin-top:6px; font-size:11px;
+    letter-spacing:.18em; opacity:.75;
+  }
+
+  /* santé des sources : discret, visible seulement si une source est figée */
+  .sante {
+    position:absolute; top:74px; left:64px;
+    font-size:10.5px; font-weight:600; letter-spacing:.22em;
+    text-transform:uppercase; color:#b96f45; display:none;
+  }
+  .sante.on { display:block; }
+  .sante:before {
+    content:''; display:inline-block; width:6px; height:6px;
+    border-radius:50%; background:#b96f45; margin-right:7px; vertical-align:middle;
+  }
+  .nuit .sante, .nuit .sante:before { color:#c98b60; background-color:#c98b60; }
 
   /* ---------- horloge ---------- */
   .clock {
@@ -58,12 +75,12 @@
   /* ---------- musique ---------- */
   .music {
     position:absolute; top:172px; right:64px;
-    width:430px; height:118px;
+    width:492px; height:118px;
     background:#35342d; color:#efe9dc;
     border-radius:59px;
     display:-webkit-flex; display:flex;
     -webkit-align-items:center; align-items:center;
-    padding:0 18px 0 14px;
+    padding:0 16px 0 14px;
   }
   .music.off { display:none; }
   .vinyl {
@@ -97,30 +114,43 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
   .mbtn {
-    display:block; width:64px; height:64px; border-radius:50%;
-    border:1px solid #5a574a; margin-left:10px;
+    display:block; width:58px; height:58px; border-radius:50%;
+    border:1px solid #5a574a; margin-left:9px;
     position:relative; text-decoration:none;
   }
   .mbtn:active { background:#4a483e; }
+  /* boutons volume, plus petits */
+  .mvol {
+    display:block; width:40px; height:40px; border-radius:50%;
+    border:1px solid #5a574a; margin-left:7px;
+    position:relative; text-decoration:none;
+  }
+  .mvol:active { background:#4a483e; }
+  .ic-moins:before, .ic-plus:before, .ic-plus:after {
+    content:''; position:absolute; background:#efe9dc; border-radius:2px;
+  }
+  .ic-moins:before { left:11px; top:19px; width:18px; height:4px; }
+  .ic-plus:before { left:11px; top:19px; width:18px; height:4px; }
+  .ic-plus:after { left:18px; top:12px; width:4px; height:18px; }
   .ic-pause:before, .ic-pause:after {
-    content:''; position:absolute; top:22px; width:6px; height:20px;
+    content:''; position:absolute; top:19px; width:6px; height:20px;
     background:#efe9dc; border-radius:2px;
   }
-  .ic-pause:before { left:24px; }
-  .ic-pause:after { left:34px; }
+  .ic-pause:before { left:21px; }
+  .ic-pause:after { left:31px; }
   .ic-next:before {
-    content:''; position:absolute; left:22px; top:22px;
+    content:''; position:absolute; left:18px; top:19px;
     border-style:solid; border-width:10px 0 10px 14px;
     border-color:transparent transparent transparent #efe9dc;
   }
   .ic-next:after {
-    content:''; position:absolute; left:40px; top:22px;
+    content:''; position:absolute; left:36px; top:19px;
     width:4px; height:20px; background:#efe9dc; border-radius:2px;
   }
   /* en pause : la capsule reste visible, tamisée, et le bouton devient lecture */
   .music.paused .vinyl, .music.paused .mtxt { opacity:.55; }
   .music.paused .ic-pause:before {
-    left:26px; top:20px; width:0; height:0; background:none;
+    left:23px; top:17px; width:0; height:0; background:none;
     border-style:solid; border-width:12px 0 12px 18px;
     border-color:transparent transparent transparent #efe9dc;
   }
@@ -168,6 +198,15 @@
     letter-spacing:.22em; text-transform:uppercase;
     opacity:.85; margin-top:4px;
   }
+  /* prochaine échéance mise en évidence : petit point d'accent sous l'item */
+  .arch .it.next small { color:#f4e9d2; opacity:1; }
+  .arch .it.next:after {
+    content:''; display:block; width:5px; height:5px; border-radius:50%;
+    background:#f4e9d2; margin:7px auto 0; opacity:.9;
+  }
+  .arch.sable .it.next small { color:#7a5334; }
+  .arch.sable .it.next:after { background:#b96f45; }
+
   /* intertitre de la section basse de l'arche agenda */
   .arch .entete2 {
     margin:14px 0 2px; font-size:11.5px; font-weight:600;
@@ -178,6 +217,17 @@
   .arch.terra { padding-top:78px; }
   .arch.terra .it { padding:6px 0; }
   .arch.terra .it small { letter-spacing:.12em; }
+
+  /* ---------- transitions douces (bascule jour ↔ nuit en fondu) ---------- */
+  #stage, .arch, .head, .meteo, .clock, .date, .sante,
+  .pendentif, .music, .vinyl, .vinyl:after, .arch .it small {
+    -webkit-transition: background-color 1s ease, color 1s ease, border-color 1s ease;
+    transition: background-color 1s ease, color 1s ease, border-color 1s ease;
+  }
+  /* zones rafraîchies en fondu léger */
+  #z-auj, #z-venir, #z-sport, #z-cinema, #z-pend, #meteo {
+    -webkit-transition: opacity .4s ease; transition: opacity .4s ease;
+  }
 
   /* ---------- mode nuit (21 h à 7 h) ---------- */
   .nuit #stage { background:#2e2d28; color:#d8d2c4; }
@@ -199,6 +249,7 @@
   <div id="stage">
 
     <div class="head">la maison · lille</div>
+    <div class="sante" id="sante"></div>
 
     <div class="meteo" id="meteo">{{METEO}}</div>
 
@@ -206,12 +257,14 @@
 
     <div class="music {{MUSIC_CLASS}}" id="music">
       <div class="vinyl">
-        <img id="m-art" alt="" onload="this.style.display='block'" onerror="this.style.display='none'">
+        <img id="m-art" alt="" onload="artCharge(this)" onerror="artErreur(this)">
       </div>
       <div class="mtxt">
         <div class="t" id="m-title">{{MUSIC_TITLE}}</div>
         <div class="a" id="m-artist">{{MUSIC_ARTIST}}</div>
       </div>
+      <a href="#" class="mvol ic-moins" onclick="return cmd('volume/moins')" aria-label="baisser le volume"></a>
+      <a href="#" class="mvol ic-plus" onclick="return cmd('volume/plus')" aria-label="monter le volume"></a>
       <a href="#" class="mbtn ic-pause" onclick="return cmd('pause')" aria-label="lecture ou pause"></a>
       <a href="#" class="mbtn ic-next" onclick="return cmd('suivant')" aria-label="suivant"></a>
     </div>
@@ -279,6 +332,22 @@
   var dernierTitre = '';
   function texte(id, v) { document.getElementById(id).innerHTML = v.replace(/</g, '&lt;'); }
 
+  // teinte la capsule avec la couleur dominante de la pochette (canvas, côté client)
+  function artCharge(img) { img.style.display = 'block'; teinterCapsule(img); }
+  function artErreur(img) { img.style.display = 'none'; document.getElementById('music').style.background = ''; }
+  function teinterCapsule(img) {
+    try {
+      var c = document.createElement('canvas'); c.width = 16; c.height = 16;
+      var ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, 16, 16);
+      var d = ctx.getImageData(0, 0, 16, 16).data, r = 0, g = 0, b = 0, n = 0;
+      for (var i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+      // assombri (facteur .3) pour garder une capsule d'encre et un texte lisible
+      var f = 0.3;
+      document.getElementById('music').style.background =
+        'rgb(' + Math.round(r / n * f) + ',' + Math.round(g / n * f) + ',' + Math.round(b / n * f) + ')';
+    } catch (e) {}
+  }
+
   function appliquerMusique(d) {
     var m = document.getElementById('music');
     // capsule masquée seulement quand rien n'est chargé ;
@@ -316,7 +385,26 @@
     setTimeout(pollMusique, 600);
     return false;
   }
-  // zones de contenu (météo, agenda, sport, studio) sans recharger la page
+  // remplace une zone en fondu, seulement si le contenu a changé (pas de clignotement)
+  var dernier = {}, premierContenu = true;
+  function swap(id, html) {
+    if (dernier[id] === html) return;
+    dernier[id] = html;
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (premierContenu) { el.innerHTML = html; return; }
+    el.style.opacity = '0';
+    setTimeout(function () { el.innerHTML = html; el.style.opacity = '1'; }, 400);
+  }
+  function majSante(figees) {
+    var el = document.getElementById('sante');
+    if (figees && figees.length) {
+      el.innerHTML = 'données figées · ' + figees.join(', ');
+      el.className = 'sante on';
+    } else { el.className = 'sante'; }
+  }
+
+  // zones de contenu (météo, agenda, sport, ciné, studio) sans recharger la page
   function pollContenu() {
     try {
       var x = new XMLHttpRequest();
@@ -325,14 +413,19 @@
         if (x.readyState === 4 && x.status === 200) {
           try {
             var d = JSON.parse(x.responseText);
-            document.getElementById('meteo').innerHTML = d.meteo;
-            document.getElementById('z-auj').innerHTML = d.agendaAuj;
-            document.getElementById('z-venir').innerHTML = d.agendaVenir;
-            document.getElementById('z-sport').innerHTML = d.sport;
-            document.getElementById('z-cinema').innerHTML = d.cinema;
+            swap('meteo', d.meteo);
+            swap('z-auj', d.agendaAuj);
+            swap('z-venir', d.agendaVenir);
+            swap('z-sport', d.sport);
+            swap('z-cinema', d.cinema);
             var pend = document.getElementById('z-pend');
-            pend.innerHTML = d.studio;
-            pend.className = d.studio ? 'pendentif' : 'pendentif off';
+            if (dernier['z-pend'] !== d.studio) {
+              dernier['z-pend'] = d.studio;
+              pend.innerHTML = d.studio;
+              pend.className = d.studio ? 'pendentif' : 'pendentif off';
+            }
+            majSante(d.figees);
+            premierContenu = false;
           } catch (e) {}
         }
       };
