@@ -269,6 +269,42 @@ async function majSport() {
    studio · endpoint netlify du media kit yum.ines
    >>> adapter les deux lignes de lecture au format réel du json <<<
    ============================================================ */
+async function abonnesInstagram(compte) {
+  // stratégie 1 : l'api web qu'utilise le site instagram lui-même (compte exact)
+  try {
+    const r = await fetch('https://i.instagram.com/api/v1/users/web_profile_info/?username=' + compte, {
+      headers: { 'User-Agent': 'Instagram 219.0.0.12.117 Android', 'x-ig-app-id': '936619743392459' },
+    });
+    if (r.ok) {
+      const j = await r.json();
+      const n = j.data && j.data.user && j.data.user.edge_followed_by && j.data.user.edge_followed_by.count;
+      if (n) return n;
+    }
+  } catch (e) { /* on tente la page html */ }
+  // stratégie 2 : la page publique du profil
+  try {
+    const r = await fetch('https://www.instagram.com/' + compte + '/', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+        'Accept-Language': 'fr-FR,fr;q=0.9',
+      },
+    });
+    if (!r.ok) return null;
+    const html = await r.text();
+    const m = html.match(/"edge_followed_by":\{"count":(\d+)/) ||
+      html.match(/"follower_count":(\d+)/) ||
+      html.match(/userInteractionCount[^\d]*(\d+)/);
+    if (m) return parseInt(m[1], 10);
+    // repli : le compte arrondi de la balise og:description ("12,8 k abonnés")
+    const og = html.match(/([\d.,]+)\s*([km]?)\s*(?:followers|abonn)/i);
+    if (og) {
+      const mult = og[2].toLowerCase() === 'm' ? 1e6 : og[2].toLowerCase() === 'k' ? 1e3 : 1;
+      return Math.round(parseFloat(og[1].replace(',', '.')) * mult);
+    }
+  } catch (e) { /* muet */ }
+  return null;
+}
+
 const HIST_PATH = path.join(__dirname, 'studio-historique.json');
 async function majStudio() {
   let abonnes = null;
@@ -280,32 +316,16 @@ async function majStudio() {
     abonnes = Number(j.followers || j.abonnes || (j.instagram && j.instagram.followers)) || null;
   }
 
-  // source 2 : lecture du profil instagram public
-  if (abonnes === null && CFG.instagram) {
-    const r = await fetch('https://www.instagram.com/' + CFG.instagram + '/', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
-        'Accept-Language': 'fr-FR,fr;q=0.9',
-      },
-    });
-    if (!r.ok) throw new Error('instagram ' + r.status);
-    const html = await r.text();
-    const m = html.match(/"edge_followed_by":\{"count":(\d+)/) ||
-      html.match(/"follower_count":(\d+)/) ||
-      html.match(/userInteractionCount[^\d]*(\d+)/);
-    if (m) {
-      abonnes = parseInt(m[1], 10);
-    } else {
-      // repli : le compte arrondi de la balise og:description ("12,8 k abonnés")
-      const og = html.match(/([\d.,]+)\s*([km]?)\s*(?:followers|abonn)/i);
-      if (og) {
-        const mult = og[2].toLowerCase() === 'm' ? 1e6 : og[2].toLowerCase() === 'k' ? 1e3 : 1;
-        abonnes = Math.round(parseFloat(og[1].replace(',', '.')) * mult);
-      }
-    }
-    if (abonnes === null) throw new Error('profil illisible (page de connexion ?)');
+  // source 2 : instagram, deux stratégies (l'api web du site, puis la page html)
+  if (abonnes === null && CFG.instagram) abonnes = await abonnesInstagram(CFG.instagram);
+
+  // source 3 : valeur manuelle de secours (config.abonnesManuel), mise à jour à la main
+  if (abonnes === null && CFG.abonnesManuel) abonnes = Number(CFG.abonnesManuel) || null;
+
+  if (!abonnes) {
+    if (CFG.instagram || CFG.statsUrl) throw new Error('instagram muet (renseigner abonnesManuel en secours)');
+    return; // rien de configuré : pendentif masqué
   }
-  if (!abonnes) return; // rien de configuré : pendentif masqué
 
   // historique quotidien local pour le delta sur 7 jours
   let hist = {};
