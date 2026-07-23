@@ -342,17 +342,25 @@ async function majCinema() {
       });
       if (!r.ok) throw new Error('allociné ' + r.status);
       const html = await r.text();
-      // une "carte" par film sur la page horaires
-      const cartes = html.split(/movie-card-theater|entity-card-list/).slice(1);
+      // une "carte" par film sur la page horaires (classe tolérante : movie-card…)
+      const cartes = html.split(/class="[^"]*movie-card/).slice(1);
       for (const carte of cartes) {
-        const t = carte.match(/meta-title-link[^>]*>\s*([^<]+?)\s*</);
-        if (!t) continue;
+        const t = carte.match(/meta-title-link[^>]*>\s*([^<]+?)\s*</) ||
+          carte.match(/meta-title-link[^>]*title="([^"]+)"/);
+        if (!t || !t[1].trim()) continue;
         const titre = t[1].trim();
-        const presse = carte.match(/Presse[\s\S]{0,300}?stareval-note[^>]*>\s*([\d,.]+)/);
-        const spect = carte.match(/Spectateurs[\s\S]{0,300}?stareval-note[^>]*>\s*([\d,.]+)/);
         const f = films[titre] || (films[titre] = { presse: 0, spect: 0 });
-        if (presse) f.presse = Math.max(f.presse, parseFloat(presse[1].replace(',', '.')));
-        if (spect) f.spect = Math.max(f.spect, parseFloat(spect[1].replace(',', '.')));
+        // chaque bloc rating-item contient un label (presse/spectateurs) et une
+        // note stareval-note, dans un ordre qui a déjà changé chez eux : on lit les deux
+        for (const ri of carte.split(/rating-item/).slice(1)) {
+          const bloc = ri.slice(0, 400);
+          const note = bloc.match(/stareval-note[^>]*>\s*([\d,.]+)/);
+          if (!note) continue;
+          const val = parseFloat(note[1].replace(',', '.'));
+          if (isNaN(val)) continue;
+          if (/presse/i.test(bloc)) f.presse = Math.max(f.presse, val);
+          else if (/spectateur/i.test(bloc)) f.spect = Math.max(f.spect, val);
+        }
       }
     } catch (e) { /* un cinéma muet n'empêche pas les autres */ }
   }
