@@ -364,7 +364,7 @@ async function abonnesInstagram(compte) {
 
 const HIST_PATH = path.join(__dirname, 'studio-historique.json');
 async function majStudio() {
-  let abonnes = null;
+  let abonnes = null, secours = false;
 
   // source 1 : endpoint dédié si un jour statsUrl est renseignée
   if (CFG.statsUrl) {
@@ -377,7 +377,7 @@ async function majStudio() {
   if (abonnes === null && CFG.instagram) abonnes = await abonnesInstagram(CFG.instagram);
 
   // source 3 : valeur manuelle de secours (config.abonnesManuel), mise à jour à la main
-  if (abonnes === null && CFG.abonnesManuel) abonnes = Number(CFG.abonnesManuel) || null;
+  if (abonnes === null && CFG.abonnesManuel) { abonnes = Number(CFG.abonnesManuel) || null; secours = true; }
 
   if (!abonnes) {
     if (CFG.instagram || CFG.statsUrl) throw new Error('instagram muet (renseigner abonnesManuel en secours)');
@@ -394,9 +394,12 @@ async function majStudio() {
   const ref = anciennes.length ? hist[anciennes[anciennes.length - 1]] : null;
   const delta = ref === null ? null : abonnes - ref;
 
+  // affichage : chiffre exact quand il vient d'instagram/statsUrl,
+  // arrondi « 13K » quand c'est la valeur de secours (à changer moins souvent)
+  const affiche = secours ? formatAbonnes(abonnes) : abonnes.toLocaleString('fr-FR');
   donnees.studio.html =
     '<div class="p-lbl">yum.ines</div>' +
-    '<div class="p-num">' + esc(formatAbonnes(abonnes)) + '</div>' +
+    '<div class="p-num">' + esc(affiche) + '</div>' +
     (delta ? '<div class="p-lbl">' + esc((delta > 0 ? '+' : '') + delta + ' sur 7 jours') + '</div>' : '');
   sante.studio = Date.now();
 }
