@@ -74,8 +74,11 @@ function decodeEntites(s) {
     .replace(/&#(\d+);/g, function (m, n) { return String.fromCharCode(parseInt(n, 10)); })
     .replace(/&#x([0-9a-f]+);/gi, function (m, n) { return String.fromCharCode(parseInt(n, 16)); })
     .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/&rsquo;|&lsquo;/g, "'").replace(/&#8217;|&#8216;/g, "'")
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&');
+    .replace(/&amp;/g, '&')
+    // apostrophes et guillemets typographiques → simples (rendu iOS 9 fiable)
+    .replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
 }
 function item(titre, sous) {
   return '<div class="it">' + esc(titre) + '<small>' + esc(sous) + '</small></div>';
