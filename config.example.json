@@ -23,7 +23,12 @@
 
   "statsUrl": "https://TON-SITE.netlify.app/.netlify/functions/stats",
 
-  "cinemas": [],
+  "cinemas": [
+    { "allocine": "P0086", "nom": "ugc lille" },
+    { "allocine": "P0047", "nom": "majestic" },
+    { "allocine": "P0022", "nom": "métropole" },
+    { "allocine": "W5965", "nom": "ugc villeneuve" }
+  ],
 
   "spotify": {
     "clientId": "",

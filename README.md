@@ -58,17 +58,18 @@ Si aucune source ne répond, le serveur affiche le contenu de `events.json`, à 
 
 ## 4 bis · ciné (arche terracotta)
 
-L'arche « ciné » affiche les 3 films à l'affiche les mieux notés (moyenne presse + spectateurs AlloCiné) dans les cinémas configurés. Pour chaque cinéma à suivre :
-
-1. Sur allocine.fr, chercher le cinéma et ouvrir sa page horaires : l'URL ressemble à `https://www.allocine.fr/seance/salle_gen_csalle=P0104.html`
-2. Reporter le code (`P0104` dans l'exemple) dans `cinemas` du config.json :
+L'arche « ciné » affiche les 3 films à l'affiche les mieux notés (moyenne presse + spectateurs AlloCiné) dans les cinémas configurés. Par défaut, les 4 salles UGC de la métropole lilloise :
 
 ```json
 "cinemas": [
-  { "allocine": "P0104", "nom": "ugc lille" },
-  { "allocine": "XXXX", "nom": "ugc villeneuve d'ascq" }
+  { "allocine": "P0086", "nom": "ugc lille" },
+  { "allocine": "P0047", "nom": "majestic" },
+  { "allocine": "P0022", "nom": "métropole" },
+  { "allocine": "W5965", "nom": "ugc villeneuve" }
 ]
 ```
+
+Pour changer de salles : sur allocine.fr, ouvrir la page horaires du cinéma voulu, le code est dans l'URL (`salle_gen_csalle=XXXX.html`).
 
 L'affiche est rafraîchie toutes les 6 h (scraping poli d'allociné ; si la structure de leurs pages change, la source logge `[maj] ciné en échec` et garde son dernier contenu). Liste vide = arche sobre, rien ne casse.
 
