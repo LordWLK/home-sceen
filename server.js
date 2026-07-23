@@ -396,9 +396,16 @@ async function majStudio() {
 
   donnees.studio.html =
     '<div class="p-lbl">yum.ines</div>' +
-    '<div class="p-num">' + esc(abonnes.toLocaleString('fr-FR')) + '</div>' +
+    '<div class="p-num">' + esc(formatAbonnes(abonnes)) + '</div>' +
     (delta ? '<div class="p-lbl">' + esc((delta > 0 ? '+' : '') + delta + ' sur 7 jours') + '</div>' : '');
   sante.studio = Date.now();
+}
+
+// nombre d'abonnés abrégé : 13100 → « 13K », 1250000 → « 1,3M » (le delta 7 j reste exact)
+function formatAbonnes(n) {
+  if (n >= 1000000) return String(Math.round(n / 100000) / 10).replace('.', ',') + 'M';
+  if (n >= 1000) return Math.round(n / 1000) + 'K';
+  return n.toLocaleString('fr-FR');
 }
 
 /* ============================================================
