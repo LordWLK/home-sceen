@@ -340,9 +340,7 @@ async function majStudio() {
   donnees.studio.html =
     '<div class="p-lbl">yum.ines</div>' +
     '<div class="p-num">' + esc(abonnes.toLocaleString('fr-FR')) + '</div>' +
-    (delta === null
-      ? '<div class="p-lbl">abonnés instagram</div>'
-      : '<div class="p-lbl">' + esc((delta >= 0 ? '+' : '') + delta + ' sur 7 jours') + '</div>');
+    (delta ? '<div class="p-lbl">' + esc((delta > 0 ? '+' : '') + delta + ' sur 7 jours') + '</div>' : '');
 }
 
 /* ============================================================
@@ -369,7 +367,8 @@ async function majCinema() {
           carte.match(/meta-title-link[^>]*title="([^"]+)"/);
         if (!t || !t[1].trim()) continue;
         const titre = t[1].trim();
-        const f = films[titre] || (films[titre] = { presse: 0, spect: 0 });
+        const f = films[titre] || (films[titre] = { presse: 0, spect: 0, ou: [] });
+        if (f.ou.indexOf(cine.nom) === -1) f.ou.push(cine.nom);
         // pour chaque note, le libellé (presse/spectateurs) est loin derrière,
         // séparé par une rangée d'icônes d'étoiles : on remonte 600 caractères
         // et on prend le dernier libellé rencontré
@@ -391,14 +390,17 @@ async function majCinema() {
     .map(titre => {
       const f = films[titre];
       const score = f.presse && f.spect ? (f.presse + f.spect) / 2 : (f.presse || f.spect);
-      return { titre, presse: f.presse, spect: f.spect, score };
+      return { titre, presse: f.presse, spect: f.spect, ou: f.ou, score };
     })
     .filter(f => f.score > 0)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+    .slice(0, 4);
   if (!classement.length) throw new Error('aucun film noté trouvé');
   donnees.cinema.html = classement.map(f => {
-    const sous = [f.presse ? 'presse ' + notes(f.presse) : '', f.spect ? 'spect ' + notes(f.spect) : '']
+    const salles = f.ou.length > 2 ? f.ou.length + ' salles' : f.ou.join(' + ');
+    const sous = [salles,
+      f.presse ? 'presse ' + notes(f.presse) : '',
+      f.spect ? 'spect ' + notes(f.spect) : '']
       .filter(Boolean).join(' · ');
     return item(f.titre.toLowerCase(), sous);
   }).join('\n');
