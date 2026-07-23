@@ -26,34 +26,31 @@ async function recupererHtml() {
     '· meta-title-link :', (html.match(/meta-title-link/g) || []).length,
     '· rating-item :', (html.match(/rating-item/g) || []).length);
 
+  // exactement le découpage et le parseur de server.js
   const cartes = html.split(/class="[^"]*movie-card/).slice(1);
-  console.log('cartes découpées :', cartes.length);
+  console.log('cartes découpées :', cartes.length, '\n');
 
-  cartes.slice(0, 3).forEach((c, i) => {
+  cartes.forEach((c, i) => {
+    const titres = (c.match(/meta-title-link[^>]*>\s*([^<]+?)\s*</g) || []).length;
     const t = c.match(/meta-title-link[^>]*>\s*([^<]+?)\s*</) || c.match(/meta-title-link[^>]*title="([^"]+)"/);
-    console.log('\n=== carte', i, '· titre :', t ? JSON.stringify(t[1].trim()) : 'INTROUVABLE');
-    console.log('  rating-items dans la carte :', c.split(/rating-item/).length - 1);
-    const m = c.indexOf('meta-title-link');
-    if (m !== -1) console.log('  contexte titre :', JSON.stringify(c.slice(m, m + 180)));
-    // id allociné du film (les anciens catalogues ont des ids bas)
+    if (!t || !t[1].trim()) return;
     const cf = c.match(/cfilm=(\d+)/);
-    console.log('  cfilm :', cf ? cf[1] : '?');
-    // toutes les années présentes dans la carte, et mention reprise n'importe où
-    const annees = (c.slice(0, 2500).match(/\b(19[2-9]\d|20[0-3]\d)\b/g) || []);
-    console.log('  années dans la carte :', annees.join(', ') || 'aucune',
-      '· "reprise" présent :', /reprise/i.test(c.slice(0, 2500)));
-    // le texte utile sous le titre (date, genre, réalisateur…), balises retirées
-    const mb = c.indexOf('meta-body');
-    if (mb !== -1) {
-      const brut = c.slice(mb, mb + 700).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      console.log('  meta-body :', JSON.stringify(brut.slice(0, 260)));
+    // notes lues exactement comme server.js
+    let presse = 0, spect = 0;
+    const matches = c.match(/stareval-note[^>]*>\s*([\d,.]+)/g) || [];
+    for (const raw of matches) {
+      const idx = c.indexOf(raw);
+      const val = parseFloat(raw.replace(/.*>\s*/, '').replace(',', '.'));
+      if (isNaN(val)) continue;
+      const avant = c.slice(Math.max(0, idx - 600), idx).toLowerCase();
+      const p = avant.lastIndexOf('presse'), s = avant.lastIndexOf('spectateur');
+      if (p === -1 && s === -1) continue;
+      if (p > s) presse = Math.max(presse, val); else spect = Math.max(spect, val);
     }
+    const flag = titres > 1 ? '  <<< ' + titres + ' TITRES DANS CE SEGMENT' : '';
+    console.log('carte', i, '·', JSON.stringify(t[1].trim()),
+      '· cfilm', cf ? cf[1] : '?',
+      '· presse', presse || '-', '· spect', spect || '-',
+      '· notes brutes:[' + matches.map(m => m.replace(/.*>\s*/, '')).join(',') + ']' + flag);
   });
-
-  // où vivent les notes si elles ne sont pas dans les cartes ?
-  const premiereNote = html.indexOf('stareval-note');
-  if (premiereNote !== -1 && !cartes.some(c => c.indexOf('stareval-note') !== -1)) {
-    console.log('\nnotes hors cartes · contexte de la première :',
-      JSON.stringify(html.slice(Math.max(0, premiereNote - 200), premiereNote + 100)));
-  }
 })().catch(e => console.log('erreur :', e.message));
