@@ -68,6 +68,15 @@ function quandLabel(d, allDay) {
 function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+// décode les entités html d'un texte scrapé (apostrophes, accents…) avant qu'esc le ré-échappe
+function decodeEntites(s) {
+  return String(s || '')
+    .replace(/&#(\d+);/g, function (m, n) { return String.fromCharCode(parseInt(n, 10)); })
+    .replace(/&#x([0-9a-f]+);/gi, function (m, n) { return String.fromCharCode(parseInt(n, 16)); })
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
 function item(titre, sous) {
   return '<div class="it">' + esc(titre) + '<small>' + esc(sous) + '</small></div>';
 }
@@ -366,7 +375,7 @@ async function majCinema() {
         const t = carte.match(/meta-title-link[^>]*>\s*([^<]+?)\s*</) ||
           carte.match(/meta-title-link[^>]*title="([^"]+)"/);
         if (!t || !t[1].trim()) continue;
-        const titre = t[1].trim();
+        const titre = decodeEntites(t[1].trim());
         const f = films[titre] || (films[titre] = { presse: 0, spect: 0, ou: [] });
         if (f.ou.indexOf(cine.nom) === -1) f.ou.push(cine.nom);
         // nouveauté ou film de catalogue qui ressort : la date allociné est
