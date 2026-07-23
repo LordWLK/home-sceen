@@ -513,7 +513,9 @@ rafraichirTout();
 majMusique();
 rafraichirCinema();
 setInterval(rafraichirTout, 2 * 60 * 1000);   // données : toutes les 2 min
-setInterval(majMusique, 2 * 1000);            // spotify : toutes les 2 s
+// spotify : 5 s. ne pas descendre : à 2 s l'api punit par des pauses
+// forcées de 90 min et plus (vécu), la capsule devient moins réactive, pas plus
+setInterval(majMusique, 5 * 1000);
 setInterval(rafraichirCinema, 6 * 3600 * 1000); // affiche ciné : toutes les 6 h
 
 serveur.listen(CFG.port, () => {

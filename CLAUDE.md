@@ -36,7 +36,7 @@ DA « arcades », retenue après 3 rondes d'exploration (sombre → clair calme 
 Un seul process Node (`server.js`), une seule dépendance (`node-ical`).
 
 - Cache en mémoire, pas de base de données
-- Données (météo, agenda, sport, studio) rafraîchies toutes les 2 min via `setInterval` ; Spotify toutes les 2 s (tolérance : la capsule n'est vidée qu'après 10 échecs consécutifs)
+- Données (météo, agenda, sport, studio) rafraîchies toutes les 2 min via `setInterval` ; Spotify toutes les 5 s — **ne pas descendre sous 5 s** : à 2 s l'API punit par des 429 avec Retry-After de 90 min et plus (tolérance : la capsule n'est vidée qu'après 10 échecs consécutifs, et le Retry-After est respecté)
 - La page est assemblée à chaque GET depuis `template.html` par remplacement de slots : `{{METEO}}`, `{{AGENDA_AUJ}}`, `{{AGENDA_VENIR}}`, `{{SPORT_ITEMS}}`, `{{STUDIO_ITEMS}}`, `{{MUSIC_CLASS}}`, `{{MUSIC_TITLE}}`, `{{MUSIC_ARTIST}}`
 - Côté iPad : poll XHR `musique/etat` toutes les 2 s + poll XHR `contenu` toutes les 60 s (remplacement innerHTML des zones `#z-*`, pas de rechargement) ; meta refresh complet toutes les 30 min par hygiène. URLs relatives, d'où la redirection 301 qui force la barre oblique finale sur `basePath`. Toutes les réponses en `Cache-Control: no-store` + horodatage anti-cache sur les polls (Safari iOS 9 met les XHR GET en cache sinon)
 - Fuseau : tout est formaté en `Europe/Paris` via `Intl` côté serveur (le VPS peut être en UTC)
