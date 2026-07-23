@@ -4,6 +4,7 @@
    coller la sortie complète dans la conversation pour ajuster le parseur. */
 
 const fs = require('fs');
+function decodeEntites(s){return String(s||"").replace(/&#(\d+);/g,function(m,n){return String.fromCharCode(parseInt(n,10));}).replace(/&#x([0-9a-f]+);/gi,function(m,n){return String.fromCharCode(parseInt(n,16));}).replace(/&quot;/g,String.fromCharCode(34)).replace(/&apos;/g,String.fromCharCode(39)).replace(/&nbsp;/g," ").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");}
 const CODE = process.argv[3] || 'P0086';
 
 async function recupererHtml() {
@@ -35,22 +36,26 @@ async function recupererHtml() {
     const t = c.match(/meta-title-link[^>]*>\s*([^<]+?)\s*</) || c.match(/meta-title-link[^>]*title="([^"]+)"/);
     if (!t || !t[1].trim()) return;
     const cf = c.match(/cfilm=(\d+)/);
-    // notes lues exactement comme server.js
+    // année du meta-body, notes bloc par bloc — exactement comme server.js
+    const mb = c.indexOf('meta-body');
+    const an = mb !== -1 ? (c.slice(mb, mb + 120).match(/\b(19\d\d|20[0-3]\d)\b/) || [])[1] : null;
     let presse = 0, spect = 0;
-    const matches = c.match(/stareval-note[^>]*>\s*([\d,.]+)/g) || [];
-    for (const raw of matches) {
-      const idx = c.indexOf(raw);
-      const val = parseFloat(raw.replace(/.*>\s*/, '').replace(',', '.'));
+    for (const bloc of c.split(/class="[^"]*rating-item/).slice(1)) {
+      const nidx = bloc.indexOf('stareval-note');
+      if (nidx === -1) continue;
+      const note = bloc.slice(nidx).match(/stareval-note[^>]*>\s*([\d,.]+)/);
+      if (!note) continue;
+      const val = parseFloat(note[1].replace(',', '.'));
       if (isNaN(val)) continue;
-      const avant = c.slice(Math.max(0, idx - 600), idx).toLowerCase();
-      const p = avant.lastIndexOf('presse'), s = avant.lastIndexOf('spectateur');
-      if (p === -1 && s === -1) continue;
-      if (p > s) presse = Math.max(presse, val); else spect = Math.max(spect, val);
+      const avant = bloc.slice(0, nidx).toLowerCase();
+      if (avant.indexOf('spectateur') !== -1) spect = Math.max(spect, val);
+      else if (avant.indexOf('presse') !== -1) presse = Math.max(presse, val);
     }
-    const flag = titres > 1 ? '  <<< ' + titres + ' TITRES DANS CE SEGMENT' : '';
-    console.log('carte', i, '·', JSON.stringify(t[1].trim()),
-      '· cfilm', cf ? cf[1] : '?',
+    const cat = (cf && parseInt(cf[1], 10) < 20000) || (an && parseInt(an, 10) <= new Date().getFullYear() - 2);
+    const flag = titres > 1 ? '  <<< ' + titres + ' TITRES' : '';
+    console.log('carte', i, '·', JSON.stringify(decodeEntites(t[1].trim())),
+      '· cfilm', cf ? cf[1] : '?', '· année', an || '?',
       '· presse', presse || '-', '· spect', spect || '-',
-      '· notes brutes:[' + matches.map(m => m.replace(/.*>\s*/, '')).join(',') + ']' + flag);
+      '·', cat ? 'REPRISE' : 'nouveauté', flag);
   });
 })().catch(e => console.log('erreur :', e.message));

@@ -378,35 +378,43 @@ async function majCinema() {
         const titre = decodeEntites(t[1].trim());
         const f = films[titre] || (films[titre] = { presse: 0, spect: 0, ou: [] });
         if (f.ou.indexOf(cine.nom) === -1) f.ou.push(cine.nom);
-        // nouveauté ou film de catalogue qui ressort : la date allociné est
-        // toujours la date de projection (récente), donc inutilisable ; le vrai
-        // signal est l'identifiant cfilm — les vieux films gardent un id bas
-        // (< 1 milliard), les sorties récentes en ont un ≥ 1 milliard
-        if (/\breprise\b/i.test(carte.slice(0, 1500))) f.catalogue = true;
+        // nouveauté ou reprise : la date de sortie du meta-body est le bon
+        // signal (l'id cfilm est trompeur — les gros films attendus ont un id
+        // bas des années avant leur sortie). filet pour les vrais classiques :
+        // un id allociné très bas (< 20000)
+        const mb = carte.indexOf('meta-body');
+        if (mb !== -1) {
+          const an = carte.slice(mb, mb + 120).match(/\b(19\d\d|20[0-3]\d)\b/);
+          if (an) f.annee = Math.min(f.annee || 9999, parseInt(an[1], 10));
+        }
+        if (/\breprise\b/i.test(carte.slice(0, 1500))) f.reprise = true;
         const cf = carte.match(/cfilm=(\d+)/);
-        if (cf && parseInt(cf[1], 10) < 1000000000) f.catalogue = true;
-        // pour chaque note, le libellé (presse/spectateurs) est loin derrière,
-        // séparé par une rangée d'icônes d'étoiles : on remonte 600 caractères
-        // et on prend le dernier libellé rencontré
-        for (const nm of carte.matchAll(/stareval-note[^>]*>\s*([\d,.]+)/g)) {
-          const val = parseFloat(nm[1].replace(',', '.'));
+        if (cf && parseInt(cf[1], 10) < 20000) f.vintage = true;
+        // notes lues bloc par bloc : chaque rating-item contient son libellé
+        // (presse/spectateurs) puis sa note, pas de contamination entre blocs
+        for (const bloc of carte.split(/class="[^"]*rating-item/).slice(1)) {
+          const nidx = bloc.indexOf('stareval-note');
+          if (nidx === -1) continue;
+          const note = bloc.slice(nidx).match(/stareval-note[^>]*>\s*([\d,.]+)/);
+          if (!note) continue;
+          const val = parseFloat(note[1].replace(',', '.'));
           if (isNaN(val)) continue;
-          const avant = carte.slice(Math.max(0, nm.index - 600), nm.index).toLowerCase();
-          const p = avant.lastIndexOf('presse');
-          const s = avant.lastIndexOf('spectateur');
-          if (p === -1 && s === -1) continue;
-          if (p > s) f.presse = Math.max(f.presse, val);
-          else f.spect = Math.max(f.spect, val);
+          const avant = bloc.slice(0, nidx).toLowerCase();
+          if (avant.indexOf('spectateur') !== -1) f.spect = Math.max(f.spect, val);
+          else if (avant.indexOf('presse') !== -1) f.presse = Math.max(f.presse, val);
         }
       }
     } catch (e) { /* un cinéma muet n'empêche pas les autres */ }
   }
   const notes = n => n.toFixed(1).replace('.', ',');
+  const anneeCourante = new Date().getFullYear();
   const tous = Object.keys(films)
     .map(titre => {
       const f = films[titre];
       const score = f.presse && f.spect ? (f.presse + f.spect) / 2 : (f.presse || f.spect);
-      return { titre, presse: f.presse, spect: f.spect, ou: f.ou, catalogue: !!f.catalogue, score };
+      // reprise : mention explicite, film vintage, ou sorti il y a ≥ 2 ans
+      const catalogue = !!f.reprise || !!f.vintage || (f.annee && f.annee <= anneeCourante - 2);
+      return { titre, presse: f.presse, spect: f.spect, ou: f.ou, catalogue, score };
     })
     .filter(f => f.score > 0)
     .sort((a, b) => b.score - a.score);
