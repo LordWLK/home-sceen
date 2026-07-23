@@ -35,12 +35,19 @@ async function recupererHtml() {
     console.log('  rating-items dans la carte :', c.split(/rating-item/).length - 1);
     const m = c.indexOf('meta-title-link');
     if (m !== -1) console.log('  contexte titre :', JSON.stringify(c.slice(m, m + 180)));
-    const n = c.indexOf('stareval-note');
-    if (n !== -1) console.log('  contexte note :', JSON.stringify(c.slice(Math.max(0, n - 120), n + 80)));
-    else console.log('  aucune stareval-note dans cette carte');
-    const entete = c.slice(0, 1200);
-    console.log('  reprise ?', /\breprise\b/i.test(entete),
-      '· année détectée :', (entete.match(/\b(19[2-9]\d|20[0-3]\d)\b/) || [null, 'aucune'])[1]);
+    // id allociné du film (les anciens catalogues ont des ids bas)
+    const cf = c.match(/cfilm=(\d+)/);
+    console.log('  cfilm :', cf ? cf[1] : '?');
+    // toutes les années présentes dans la carte, et mention reprise n'importe où
+    const annees = (c.slice(0, 2500).match(/\b(19[2-9]\d|20[0-3]\d)\b/g) || []);
+    console.log('  années dans la carte :', annees.join(', ') || 'aucune',
+      '· "reprise" présent :', /reprise/i.test(c.slice(0, 2500)));
+    // le texte utile sous le titre (date, genre, réalisateur…), balises retirées
+    const mb = c.indexOf('meta-body');
+    if (mb !== -1) {
+      const brut = c.slice(mb, mb + 700).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      console.log('  meta-body :', JSON.stringify(brut.slice(0, 260)));
+    }
   });
 
   // où vivent les notes si elles ne sont pas dans les cartes ?
