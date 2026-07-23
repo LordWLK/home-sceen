@@ -382,13 +382,10 @@ async function majCinema() {
         // signal (l'id cfilm est trompeur — les gros films attendus ont un id
         // bas des années avant leur sortie). filet pour les vrais classiques :
         // un id allociné très bas (< 20000)
-        const mb = carte.indexOf('meta-body');
-        if (mb !== -1) {
-          // la date est nichée dans des div imbriqués : on retire les balises d'abord
-          const txt = carte.slice(mb, mb + 400).replace(/<[^>]+>/g, ' ');
-          const an = txt.match(/\b(19\d\d|20[0-3]\d)\b/);
-          if (an) f.annee = Math.min(f.annee || 9999, parseInt(an[1], 10));
-        }
+        // date de sortie « 25 mars 2022 » : on ancre sur le nom du mois pour
+        // capter l'année, plus fiable qu'une fenêtre de caractères
+        const dm = carte.match(/(?:janvier|f[eé]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[eé]cembre)\s+(\d{4})/i);
+        if (dm) f.annee = Math.min(f.annee || 9999, parseInt(dm[1], 10));
         if (/\breprise\b/i.test(carte.slice(0, 1500))) f.reprise = true;
         const cf = carte.match(/cfilm=(\d+)/);
         if (cf && parseInt(cf[1], 10) < 20000) f.vintage = true;

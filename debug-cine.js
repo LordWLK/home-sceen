@@ -37,8 +37,7 @@ async function recupererHtml() {
     if (!t || !t[1].trim()) return;
     const cf = c.match(/cfilm=(\d+)/);
     // année du meta-body, notes bloc par bloc — exactement comme server.js
-    const mb = c.indexOf('meta-body');
-    const an = mb !== -1 ? (c.slice(mb, mb + 400).replace(/<[^>]+>/g, ' ').match(/\b(19\d\d|20[0-3]\d)\b/) || [])[1] : null;
+    const an = (c.match(/(?:janvier|f[eé]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[eé]cembre)\s+(\d{4})/i) || [])[1] || null;
     let presse = 0, spect = 0;
     for (const bloc of c.split(/class="[^"]*rating-item/).slice(1)) {
       const nidx = bloc.indexOf('stareval-note');
