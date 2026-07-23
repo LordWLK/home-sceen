@@ -75,7 +75,7 @@ L'affiche est rafraîchie toutes les 6 h (scraping poli d'allociné ; si la stru
 
 ## 5 · stats yum.ines
 
-Renseigner `statsUrl` avec l'endpoint Netlify du media kit : les stats s'affichent dans le pendentif terracotta en haut de l'écran (masqué tant que `statsUrl` est vide). Si le JSON renvoyé n'a pas des champs `followers` / `delta7`, adapter les deux lignes de lecture dans `majStudio()` (server.js, section studio, c'est commenté).
+Le pendentif terracotta en haut de l'écran affiche les abonnés Instagram du compte configuré dans `instagram` (lecture du profil public toutes les 6 h, historique local pour le « +X sur 7 jours »). Masqué tant que rien n'est configuré ou que la source échoue. Si un endpoint dédié existe un jour, le renseigner dans `statsUrl` : il devient prioritaire.
 
 ## 6 · chemin secret et lancement
 

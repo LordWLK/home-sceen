@@ -269,16 +269,60 @@ async function majSport() {
    studio · endpoint netlify du media kit yum.ines
    >>> adapter les deux lignes de lecture au format réel du json <<<
    ============================================================ */
+const HIST_PATH = path.join(__dirname, 'studio-historique.json');
 async function majStudio() {
-  if (!CFG.statsUrl) return; // pas encore branché : le pendentif reste masqué
-  const r = await fetch(CFG.statsUrl);
-  const j = await r.json();
-  const abonnes = j.followers || j.abonnes || (j.instagram && j.instagram.followers);
-  const delta = j.delta7 || j.weeklyGrowth || (j.instagram && j.instagram.delta7) || 0;
+  let abonnes = null;
+
+  // source 1 : endpoint dédié si un jour statsUrl est renseignée
+  if (CFG.statsUrl) {
+    const r = await fetch(CFG.statsUrl);
+    const j = await r.json();
+    abonnes = Number(j.followers || j.abonnes || (j.instagram && j.instagram.followers)) || null;
+  }
+
+  // source 2 : lecture du profil instagram public
+  if (abonnes === null && CFG.instagram) {
+    const r = await fetch('https://www.instagram.com/' + CFG.instagram + '/', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+        'Accept-Language': 'fr-FR,fr;q=0.9',
+      },
+    });
+    if (!r.ok) throw new Error('instagram ' + r.status);
+    const html = await r.text();
+    const m = html.match(/"edge_followed_by":\{"count":(\d+)/) ||
+      html.match(/"follower_count":(\d+)/) ||
+      html.match(/userInteractionCount[^\d]*(\d+)/);
+    if (m) {
+      abonnes = parseInt(m[1], 10);
+    } else {
+      // repli : le compte arrondi de la balise og:description ("12,8 k abonnés")
+      const og = html.match(/([\d.,]+)\s*([km]?)\s*(?:followers|abonn)/i);
+      if (og) {
+        const mult = og[2].toLowerCase() === 'm' ? 1e6 : og[2].toLowerCase() === 'k' ? 1e3 : 1;
+        abonnes = Math.round(parseFloat(og[1].replace(',', '.')) * mult);
+      }
+    }
+    if (abonnes === null) throw new Error('profil illisible (page de connexion ?)');
+  }
+  if (!abonnes) return; // rien de configuré : pendentif masqué
+
+  // historique quotidien local pour le delta sur 7 jours
+  let hist = {};
+  try { hist = JSON.parse(fs.readFileSync(HIST_PATH, 'utf8')); } catch (e) { /* premier passage */ }
+  hist[jourCle(new Date())] = abonnes;
+  try { fs.writeFileSync(HIST_PATH, JSON.stringify(hist)); } catch (e) { /* tant pis */ }
+  const cle7 = jourCle(new Date(Date.now() - 7 * 86400000));
+  const anciennes = Object.keys(hist).filter(k => k <= cle7).sort();
+  const ref = anciennes.length ? hist[anciennes[anciennes.length - 1]] : null;
+  const delta = ref === null ? null : abonnes - ref;
+
   donnees.studio.html =
     '<div class="p-lbl">yum.ines</div>' +
-    '<div class="p-num">' + esc(Number(abonnes).toLocaleString('fr-FR')) + '</div>' +
-    '<div class="p-lbl">' + esc((delta >= 0 ? '+' : '') + delta + ' sur 7 jours') + '</div>';
+    '<div class="p-num">' + esc(abonnes.toLocaleString('fr-FR')) + '</div>' +
+    (delta === null
+      ? '<div class="p-lbl">abonnés instagram</div>'
+      : '<div class="p-lbl">' + esc((delta >= 0 ? '+' : '') + delta + ' sur 7 jours') + '</div>');
 }
 
 /* ============================================================
@@ -499,24 +543,26 @@ const serveur = http.createServer(async (req, res) => {
 
 /* ---------- rafraîchissements périodiques ---------- */
 async function rafraichirTout() {
-  const taches = [majMeteo(), majAgenda(), majSport(), majStudio()];
-  const noms = ['météo', 'agenda', 'sport', 'studio'];
+  const taches = [majMeteo(), majAgenda(), majSport()];
+  const noms = ['météo', 'agenda', 'sport'];
   (await Promise.allSettled(taches)).forEach((r, i) => {
     if (r.status === 'rejected') console.log('[maj]', noms[i], 'en échec :', r.reason.message);
   });
 }
-function rafraichirCinema() {
+// sources lentes, interrogées avec parcimonie : scraping allociné et instagram
+function rafraichirLent() {
   majCinema().catch(e => console.log('[maj] ciné en échec :', e.message));
+  majStudio().catch(e => console.log('[maj] studio en échec :', e.message));
 }
 
 rafraichirTout();
 majMusique();
-rafraichirCinema();
+rafraichirLent();
 setInterval(rafraichirTout, 2 * 60 * 1000);   // données : toutes les 2 min
 // spotify : 5 s. ne pas descendre : à 2 s l'api punit par des pauses
 // forcées de 90 min et plus (vécu), la capsule devient moins réactive, pas plus
 setInterval(majMusique, 5 * 1000);
-setInterval(rafraichirCinema, 6 * 3600 * 1000); // affiche ciné : toutes les 6 h
+setInterval(rafraichirLent, 6 * 3600 * 1000); // ciné + stats : toutes les 6 h
 
 serveur.listen(CFG.port, () => {
   console.log('écran maison prêt : http://<ip-du-vps>:' + CFG.port + CFG.basePath + '/');

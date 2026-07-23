@@ -21,7 +21,8 @@
 
   "ufcFrancais": ["gane", "saint denis", "imavov", "fiorot", "ziam", "gomis", "charriere", "lapilus"],
 
-  "statsUrl": "https://TON-SITE.netlify.app/.netlify/functions/stats",
+  "instagram": "yum.ines",
+  "statsUrl": "",
 
   "cinemas": [
     { "allocine": "P0086", "nom": "ugc lille" },
