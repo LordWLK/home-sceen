@@ -643,16 +643,26 @@ const serveur = http.createServer(async (req, res) => {
       setTimeout(majMusique, 800);
       json(res, { ok: true });
 
+    } else if (route === '/musique/precedent') {
+      await spFetch('/me/player/previous', 'POST');
+      setTimeout(majMusique, 800);
+      json(res, { ok: true });
+
     } else if (route === '/musique/volume/plus' || route === '/musique/volume/moins') {
       // lit le volume courant de l'appareil actif puis l'ajuste de ±10 %
-      let vol = 50;
+      let vol = null;
       try {
         const pr = await spFetch('/me/player');
-        if (pr.ok) { const pj = await pr.json(); if (pj && pj.device) vol = pj.device.volume_percent; }
-      } catch (e) { /* on part de 50 % */ }
+        if (pr.status === 200) {
+          const pj = await pr.json();
+          if (pj && pj.device && typeof pj.device.volume_percent === 'number') vol = pj.device.volume_percent;
+        }
+      } catch (e) { /* on retombe sur 50 % */ }
+      if (vol === null) vol = 50;
       vol = route.slice(-4) === 'plus' ? Math.min(100, vol + 10) : Math.max(0, vol - 10);
-      await spFetch('/me/player/volume?volume_percent=' + vol, 'PUT');
-      json(res, { ok: true, volume: vol });
+      const vr = await spFetch('/me/player/volume?volume_percent=' + vol, 'PUT');
+      if (!vr.ok) console.log('[spotify] volume refusé (' + vr.status + ') — appareil sans contrôle de volume ?');
+      json(res, { ok: vr.ok, volume: vol });
 
     } else if (route === '/musique/pochette') {
       if (musique.artBuf) {

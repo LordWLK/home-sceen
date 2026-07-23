@@ -75,7 +75,7 @@
   /* ---------- musique ---------- */
   .music {
     position:absolute; top:172px; right:64px;
-    width:492px; height:118px;
+    width:520px; height:118px;
     background:#35342d; color:#efe9dc;
     border-radius:59px;
     display:-webkit-flex; display:flex;
@@ -114,14 +114,14 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
   .mbtn {
-    display:block; width:58px; height:58px; border-radius:50%;
-    border:1px solid #5a574a; margin-left:9px;
+    display:block; width:54px; height:54px; border-radius:50%;
+    border:1px solid #5a574a; margin-left:7px;
     position:relative; text-decoration:none;
   }
   .mbtn:active { background:#4a483e; }
   /* boutons volume, plus petits */
   .mvol {
-    display:block; width:40px; height:40px; border-radius:50%;
+    display:block; width:38px; height:38px; border-radius:50%;
     border:1px solid #5a574a; margin-left:7px;
     position:relative; text-decoration:none;
   }
@@ -129,28 +129,37 @@
   .ic-moins:before, .ic-plus:before, .ic-plus:after {
     content:''; position:absolute; background:#efe9dc; border-radius:2px;
   }
-  .ic-moins:before { left:11px; top:19px; width:18px; height:4px; }
-  .ic-plus:before { left:11px; top:19px; width:18px; height:4px; }
-  .ic-plus:after { left:18px; top:12px; width:4px; height:18px; }
+  .ic-moins:before { left:10px; top:17px; width:18px; height:4px; }
+  .ic-plus:before { left:10px; top:17px; width:18px; height:4px; }
+  .ic-plus:after { left:17px; top:10px; width:4px; height:18px; }
   .ic-pause:before, .ic-pause:after {
-    content:''; position:absolute; top:19px; width:6px; height:20px;
+    content:''; position:absolute; top:17px; width:6px; height:20px;
     background:#efe9dc; border-radius:2px;
   }
-  .ic-pause:before { left:21px; }
-  .ic-pause:after { left:31px; }
+  .ic-pause:before { left:19px; }
+  .ic-pause:after { left:29px; }
   .ic-next:before {
-    content:''; position:absolute; left:18px; top:19px;
+    content:''; position:absolute; left:17px; top:17px;
     border-style:solid; border-width:10px 0 10px 14px;
     border-color:transparent transparent transparent #efe9dc;
   }
   .ic-next:after {
-    content:''; position:absolute; left:36px; top:19px;
+    content:''; position:absolute; left:33px; top:17px;
     width:4px; height:20px; background:#efe9dc; border-radius:2px;
+  }
+  .ic-prev:before {
+    content:''; position:absolute; left:15px; top:17px;
+    width:4px; height:20px; background:#efe9dc; border-radius:2px;
+  }
+  .ic-prev:after {
+    content:''; position:absolute; left:21px; top:17px;
+    border-style:solid; border-width:10px 14px 10px 0;
+    border-color:transparent #efe9dc transparent transparent;
   }
   /* en pause : la capsule reste visible, tamisée, et le bouton devient lecture */
   .music.paused .vinyl, .music.paused .mtxt { opacity:.55; }
   .music.paused .ic-pause:before {
-    left:23px; top:17px; width:0; height:0; background:none;
+    left:20px; top:15px; width:0; height:0; background:none;
     border-style:solid; border-width:12px 0 12px 18px;
     border-color:transparent transparent transparent #efe9dc;
   }
@@ -265,6 +274,7 @@
       </div>
       <a href="#" class="mvol ic-moins" onclick="return cmd('volume/moins')" aria-label="baisser le volume"></a>
       <a href="#" class="mvol ic-plus" onclick="return cmd('volume/plus')" aria-label="monter le volume"></a>
+      <a href="#" class="mbtn ic-prev" onclick="return cmd('precedent')" aria-label="précédent"></a>
       <a href="#" class="mbtn ic-pause" onclick="return cmd('pause')" aria-label="lecture ou pause"></a>
       <a href="#" class="mbtn ic-next" onclick="return cmd('suivant')" aria-label="suivant"></a>
     </div>
