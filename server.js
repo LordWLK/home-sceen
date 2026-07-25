@@ -23,6 +23,7 @@ const donnees = {
   sport: { html: '' },
   studio: { html: '' },
   cinema: { html: '' },
+  menage: { compact: '', planning: '' },
 };
 const musique = {
   playing: false, title: '', artist: '',
@@ -498,6 +499,73 @@ async function majCinema() {
 }
 
 /* ============================================================
+   ménage · roulement fixe (config.menage), une personne par jour,
+   week-end à deux ; le serveur calcule où on en est dans le cycle
+   ============================================================ */
+function joursDepuis(dateStr) {
+  // nombre de jours entre dateStr (AAAA-MM-JJ) et aujourd'hui, en heure de paris
+  const p = parisParts(new Date());
+  const auj = Date.UTC(+p.year, +p.month - 1, +p.day);
+  const m = String(dateStr).split('-');
+  const dep = Date.UTC(+m[0], +m[1] - 1, +m[2]);
+  return Math.round((auj - dep) / 86400000);
+}
+function cycleMenage() {
+  // déplie les semaines en un tableau jour par jour (lun→dim), week-end à deux
+  const cy = [];
+  (CFG.menage.semaines || []).forEach(s => {
+    (s.jours || []).forEach(j => cy.push({ qui: j[0], tache: j[1] }));
+    cy.push({ qui: 'tous', tache: s.we });
+    cy.push({ qui: 'tous', tache: s.we });
+  });
+  return cy; // 42 entrées pour 6 semaines
+}
+function entreeMenage(cy, offsetJours) {
+  const n = cy.length;
+  const idx = ((joursDepuis(CFG.menage.depart) + offsetJours) % n + n) % n;
+  return cy[idx];
+}
+function dotsMenage(qui) {
+  if (qui === 'tous') return { cls: 'we', nom: 'ensemble' };
+  return { cls: qui === 'Inès' ? 'i' : 'a', nom: qui };
+}
+function majMenage() {
+  if (!CFG.menage || !Array.isArray(CFG.menage.semaines) || !CFG.menage.semaines.length) return;
+  const cy = cycleMenage();
+  if (!cy.length) return;
+
+  // ligne compacte de l'écran principal (aujourd'hui)
+  const e = entreeMenage(cy, 0);
+  const d = dotsMenage(e.qui);
+  const pts = e.qui === 'tous'
+    ? '<span class="dot a"></span><span class="dot i"></span>'
+    : '<span class="dot ' + d.cls + '"></span>';
+  donnees.menage.compact = '<span class="lab">ménage</span>' + pts +
+    '<span class="nom">' + esc(d.nom) + '</span><span class="tache">' + esc(e.tache) + '</span>';
+
+  // planning : semaine dernière · cette semaine (aujourd'hui) · semaine prochaine
+  const jrs = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
+  const titres = ['semaine dernière', 'cette semaine', 'semaine prochaine'];
+  const jd = joursDepuis(CFG.menage.depart);
+  const dow = ((jd % 7) + 7) % 7; // depart = lundi → 0
+  let html = '';
+  for (let w = -1; w <= 1; w++) {
+    html += '<div class="sem"><div class="sh">' + titres[w + 1] + '</div>';
+    for (let jour = 0; jour < 7; jour++) {
+      const ent = entreeMenage(cy, w * 7 + (jour - dow));
+      const dd = dotsMenage(ent.qui);
+      let cls = 'row ' + dd.cls;
+      if (w === 0 && jour === dow) cls += ' today';
+      html += '<div class="' + cls + '"><div class="jr">' + jrs[jour] + '</div>' +
+        '<div class="ct"><div class="nm">' + esc(dd.nom) + '</div>' +
+        '<div class="tk">' + esc(ent.tache) + '</div></div></div>';
+    }
+    html += '</div>';
+  }
+  donnees.menage.planning = html;
+}
+
+/* ============================================================
    spotify · web api (compte premium), token rafraîchi au besoin
    ============================================================ */
 let tokenBloqueJusqua = 0; // backoff : ne pas marteler accounts.spotify.com à 2 s si ça échoue
@@ -594,6 +662,9 @@ function page() {
     .replace('{{STUDIO_ITEMS}}', donnees.studio.html)
     .replace('{{PEND_CLASS}}', donnees.studio.html ? '' : 'off')
     .replace('{{CINEMA_ITEMS}}', donnees.cinema.html)
+    .replace('{{MENAGE_COMPACT}}', donnees.menage.compact)
+    .replace('{{MENAGE_CLASS}}', donnees.menage.compact ? '' : 'off')
+    .replace('{{MENAGE_PLANNING}}', donnees.menage.planning)
     .replace('{{MUSIC_CLASS}}', musique.title ? (musique.playing ? '' : 'paused') : 'off')
     .replace('{{MUSIC_TITLE}}', esc(musique.title))
     .replace('{{MUSIC_ARTIST}}', esc(musique.artist));
@@ -640,6 +711,8 @@ const serveur = http.createServer(async (req, res) => {
         sport: donnees.sport.html,
         studio: donnees.studio.html,
         cinema: donnees.cinema.html,
+        menageCompact: donnees.menage.compact,
+        menagePlanning: donnees.menage.planning,
         figees: sourcesFigees(),
       });
 
@@ -688,6 +761,7 @@ const serveur = http.createServer(async (req, res) => {
 
 /* ---------- rafraîchissements périodiques ---------- */
 async function rafraichirTout() {
+  majMenage(); // calcul local, pas de réseau : recalculé à chaque tour (change chaque jour)
   const taches = [majMeteo(), majAgenda(), majSport()];
   const noms = ['météo', 'agenda', 'sport'];
   (await Promise.allSettled(taches)).forEach((r, i) => {

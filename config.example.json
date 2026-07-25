@@ -32,6 +32,18 @@
     { "allocine": "W5965", "nom": "ugc villeneuve" }
   ],
 
+  "menage": {
+    "depart": "2026-07-20",
+    "semaines": [
+      { "jours": [["Antoine","poussières salon"],["Inès","cuisine placards hauts + entrée"],["Antoine","poussières séjour (1/2 + superficiel)"],["Inès","1 escalier + sol bas"],["Antoine","WC du bas"]], "we": "SDB complète" },
+      { "jours": [["Inès","bureau Inès"],["Antoine","bureau Antoine"],["Inès","chambre poussières"],["Antoine","escalier 2 + sols du 1er"],["Inès","WC du bas"]], "we": "SDB complète + draps" },
+      { "jours": [["Antoine","poussières salon"],["Inès","séjour poussières (1/2 + superficiel)"],["Antoine","hotte"],["Inès","frigo"],["Antoine","WC du bas"]], "we": "SDB complète + sols chambre" },
+      { "jours": [["Inès","bureau Inès"],["Antoine","bureau Antoine"],["Inès","poussières chambre"],["Antoine","cuisine placards bas"],["Inès","WC du bas"]], "we": "SDB complète + vitres RDC" },
+      { "jours": [["Antoine","poussières salon"],["Inès","poussières séjour (1/2 + superficiel)"],["Antoine","entrée porte + plinthes"],["Inès","1 escalier + sol bas"],["Antoine","WC du bas"]], "we": "SDB complète + vitres restantes" },
+      { "jours": [["Inès","bureau Inès"],["Antoine","bureau Antoine"],["Inès","cuisine (four + micro-ondes)"],["Antoine","chambre poussières"],["Inès","WC du bas"]], "we": "SDB + sols chambre et 1er" }
+    ]
+  },
+
   "spotify": {
     "clientId": "",
     "clientSecret": "",

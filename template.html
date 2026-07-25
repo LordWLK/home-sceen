@@ -61,16 +61,62 @@
 
   /* ---------- horloge ---------- */
   .clock {
-    position:absolute; left:64px; top:126px;
+    position:absolute; left:64px; top:104px;
     font-family:"Optima", "Avenir Next", sans-serif;
-    font-size:124px; font-weight:500; line-height:1;
+    font-size:106px; font-weight:500; line-height:1;
     color:#33322b; letter-spacing:.01em;
   }
   .date {
-    position:absolute; left:68px; top:270px;
+    position:absolute; left:68px; top:226px;
     font-family:Georgia, serif; font-style:italic;
     font-size:27px; color:#7c7361;
   }
+
+  /* ---------- système de vues (principal + écrans de détail) ---------- */
+  .vue { position:absolute; left:0; top:0; width:1024px; height:768px; }
+
+  /* ménage compact sur l'écran principal (tactile → détail) */
+  .menage {
+    position:absolute; left:64px; top:274px; height:34px; max-width:430px;
+    display:-webkit-flex; display:flex; -webkit-align-items:center; align-items:center;
+    background:#efe7d6; border-radius:18px; padding:0 18px;
+  }
+  .menage.off { display:none; }
+  .menage .lab { font-size:10.5px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:#a2947c; margin-right:14px; -webkit-flex:0 0 auto; flex:0 0 auto; }
+  .menage .dot { width:10px; height:10px; border-radius:50%; margin-right:8px; -webkit-flex:0 0 auto; flex:0 0 auto; }
+  .menage .dot.a { background:#75815f; } .menage .dot.i { background:#b96f45; }
+  .menage .nom { font-size:15px; font-weight:700; margin-right:10px; -webkit-flex:0 0 auto; flex:0 0 auto; }
+  .menage .tache { font-size:13px; font-weight:600; color:#8a7d66; letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .menage:after { content:''; width:16px; height:2px; background:#c9b79a; border-radius:1px; margin-left:16px; -webkit-flex:0 0 auto; flex:0 0 auto; }
+
+  /* ---------- écran de détail ménage ---------- */
+  #vue-menage { background:#f6f1e8; }
+  .retour { position:absolute; top:52px; left:64px; font-size:12px; font-weight:600; letter-spacing:.24em; text-transform:uppercase; color:#8a7d66; }
+  .retour:before { content:'\2039'; margin-right:9px; font-size:16px; }
+  .titre-ecran { position:absolute; top:70px; left:0; right:0; text-align:center; font-family:Georgia,serif; font-style:italic; font-size:42px; color:#4a463c; }
+  .legende { position:absolute; top:150px; left:0; right:0; text-align:center; font-size:12px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:#8a7d66; }
+  .legende b { display:inline-block; margin:0 14px; font-weight:600; }
+  .legende .pt { display:inline-block; width:11px; height:11px; border-radius:50%; margin-right:8px; }
+  .legende .pt.a { background:#75815f; } .legende .pt.i { background:#b96f45; }
+  #vue-menage .planning { position:absolute; left:80px; right:80px; top:206px; bottom:36px; display:-webkit-flex; display:flex; }
+  #vue-menage .sem { -webkit-flex:1; flex:1; margin:0 10px; }
+  #vue-menage .sh { text-align:center; font-size:11px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:#a2947c; margin-bottom:12px; }
+  #vue-menage .row { display:-webkit-flex; display:flex; -webkit-align-items:center; align-items:center; background:#f1ece0; border-radius:10px; padding:9px 12px; margin-bottom:8px; border-left:4px solid #75815f; }
+  #vue-menage .row.i { border-left-color:#b96f45; }
+  #vue-menage .row.we { border-left-color:#c9a24a; }
+  #vue-menage .row.today { background:#e7ded0; box-shadow:0 0 0 2px #c9b79a inset; }
+  #vue-menage .jr { width:34px; -webkit-flex:0 0 auto; flex:0 0 auto; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#8a7d66; }
+  #vue-menage .nm { font-size:13px; font-weight:700; color:#3f3d34; }
+  #vue-menage .tk { font-size:11px; font-weight:600; color:#8a7d66; margin-top:2px; letter-spacing:.03em; }
+
+  /* détail ménage en mode nuit */
+  .nuit #vue-menage { background:#2e2d28; }
+  .nuit .titre-ecran { color:#d8d2c4; }
+  .nuit #vue-menage .row { background:#38362f; }
+  .nuit #vue-menage .row.today { background:#454136; }
+  .nuit #vue-menage .nm { color:#e2ddce; }
+  .nuit .menage { background:#38362f; }
+  .nuit .menage .tache { color:#a89e88; }
 
   /* ---------- musique ---------- */
   .music {
@@ -257,6 +303,8 @@
 <div id="fit">
   <div id="stage">
 
+  <div class="vue" id="vue-principal">
+
     <div class="head">la maison · lille</div>
     <div class="sante" id="sante"></div>
 
@@ -282,6 +330,8 @@
     <div class="clock" id="clock">--:--</div>
     <div class="date" id="date">&nbsp;</div>
 
+    <div class="menage {{MENAGE_CLASS}}" id="z-menage" onclick="montrer('vue-menage')">{{MENAGE_COMPACT}}</div>
+
     <div class="arches">
       <div class="arch olive">
         <h3>aujourd'hui</h3>
@@ -298,6 +348,15 @@
         <div id="z-cinema">{{CINEMA_ITEMS}}</div>
       </div>
     </div>
+
+  </div><!-- /vue-principal -->
+
+  <div class="vue" id="vue-menage" style="display:none">
+    <div class="retour" onclick="montrer('vue-principal')">accueil</div>
+    <div class="titre-ecran">ménage</div>
+    <div class="legende"><b><span class="pt a"></span>Antoine</b><b><span class="pt i"></span>Inès</b></div>
+    <div class="planning" id="z-menage-plan">{{MENAGE_PLANNING}}</div>
+  </div>
 
   </div>
 </div>
@@ -434,6 +493,17 @@
               pend.innerHTML = d.studio;
               pend.className = d.studio ? 'pendentif' : 'pendentif off';
             }
+            var mz = document.getElementById('z-menage');
+            if (dernier['z-menage'] !== d.menageCompact) {
+              dernier['z-menage'] = d.menageCompact;
+              mz.innerHTML = d.menageCompact;
+              mz.className = d.menageCompact ? 'menage' : 'menage off';
+            }
+            var mp = document.getElementById('z-menage-plan');
+            if (mp && dernier['z-menage-plan'] !== d.menagePlanning) {
+              dernier['z-menage-plan'] = d.menagePlanning;
+              mp.innerHTML = d.menagePlanning;
+            }
             majSante(d.figees);
             premierContenu = false;
           } catch (e) {}
@@ -448,9 +518,30 @@
   setTimeout(pollContenu, 2000);
   setInterval(pollContenu, 60000);
 
+  // ---- navigation entre l'écran principal et les écrans de détail ----
+  var vueActive = 'vue-principal', retourTimer = null;
+  function montrer(id) {
+    var vs = document.querySelectorAll('.vue');
+    for (var i = 0; i < vs.length; i++) { vs[i].style.display = (vs[i].id === id) ? 'block' : 'none'; }
+    vueActive = id;
+    planifierRetour();
+    return false;
+  }
+  function planifierRetour() {
+    if (retourTimer) { clearTimeout(retourTimer); retourTimer = null; }
+    // hors écran principal : retour auto après 5 min sans interaction
+    if (vueActive !== 'vue-principal') {
+      retourTimer = setTimeout(function () { montrer('vue-principal'); }, 300000);
+    }
+  }
+  function reArmer() { if (vueActive !== 'vue-principal') planifierRetour(); }
+  document.addEventListener('touchstart', reArmer, true);
+  document.addEventListener('click', reArmer, true);
+
   // filet de sécurité : en mode plein écran ios 9, le meta refresh est
-  // parfois capricieux ; on force aussi le rechargement complet en js
-  setTimeout(function () { window.location.reload(true); }, 1800000);
+  // parfois capricieux ; on force aussi le rechargement complet en js,
+  // uniquement sur l'écran principal (ne pas interrompre une consultation)
+  setInterval(function () { if (vueActive === 'vue-principal') window.location.reload(true); }, 1800000);
 </script>
 </body>
 </html>
