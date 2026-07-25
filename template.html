@@ -161,6 +161,21 @@
   .nuit #vue-sport .aff { color:#e2ddce; }
   .nuit #vue-sport .cal .h { color:#d8cdb0; }
 
+  /* ---------- écran de détail ciné (4 colonnes, une par cinéma) ---------- */
+  #vue-cine { background:#f6f1e8; }
+  #vue-cine .titre-ecran { color:#8a4a28; }
+  #vue-cine .cols { position:absolute; left:48px; right:48px; top:158px; bottom:36px; display:-webkit-flex; display:flex; }
+  #vue-cine .cine { -webkit-flex:1; flex:1; margin:0 8px; background:#f3e7de; border-radius:16px; padding:16px 14px; }
+  #vue-cine .ch { text-align:center; font-family:Georgia,serif; font-style:italic; font-size:18px; color:#8a4a28; padding-bottom:12px; border-bottom:1px solid #e6cdbb; margin-bottom:6px; }
+  #vue-cine .film { margin-top:14px; }
+  #vue-cine .film .n { font-size:14.5px; font-weight:700; color:#3f3d34; line-height:1.2; }
+  #vue-cine .film .no { font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#b96f45; margin-top:3px; }
+  #vue-cine .film .rep { display:inline-block; font-size:9.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#fff; background:#b96f45; border-radius:5px; padding:1px 6px; margin-top:4px; }
+  .nuit #vue-cine { background:#2e2d28; }
+  .nuit #vue-cine .cine { background:#38322c; }
+  .nuit #vue-cine .film .n { color:#e2ddce; }
+  .nuit #vue-cine .ch { color:#c98b60; border-bottom-color:#4a4038; }
+
   /* arches tactiles : petit repère sous le titre */
   .arch.tap h3:after { content:''; display:block; width:22px; height:3px; border-radius:2px; background:currentColor; opacity:.35; margin:9px auto 0; }
 
@@ -389,7 +404,7 @@
         <h3>sport</h3>
         <div id="z-sport">{{SPORT_ITEMS}}</div>
       </div>
-      <div class="arch terra">
+      <div class="arch terra tap" onclick="return ouvrirCine()">
         <h3>ciné</h3>
         <div id="z-cinema">{{CINEMA_ITEMS}}</div>
       </div>
@@ -419,6 +434,12 @@
     <div class="retour" onclick="montrer('vue-principal')">accueil</div>
     <div class="titre-ecran">sport</div>
     <div class="liste" id="sp-liste"></div>
+  </div>
+
+  <div class="vue" id="vue-cine" style="display:none">
+    <div class="retour" onclick="montrer('vue-principal')">accueil</div>
+    <div class="titre-ecran">ciné</div>
+    <div class="cols" id="ci-cols"></div>
   </div>
 
   </div>
@@ -569,6 +590,7 @@
             }
             if (d.agendaSemaines) { agSem = d.agendaSemaines; if (vueActive === 'vue-agenda') agRender(); }
             if (typeof d.sportDetail === 'string') { spDetail = d.sportDetail; if (vueActive === 'vue-sport') document.getElementById('sp-liste').innerHTML = spDetail; }
+            if (typeof d.cinemaDetail === 'string') { ciDetail = d.cinemaDetail; if (vueActive === 'vue-cine') document.getElementById('ci-cols').innerHTML = ciDetail; }
             majSante(d.figees);
             premierContenu = false;
           } catch (e) {}
@@ -621,6 +643,14 @@
   function ouvrirSport() {
     montrer('vue-sport');
     document.getElementById('sp-liste').innerHTML = spDetail || '<div class="sect">chargement</div>';
+    return false;
+  }
+
+  // ---- écran ciné : 4 colonnes pré-rendues par le serveur ----
+  var ciDetail = '';
+  function ouvrirCine() {
+    montrer('vue-cine');
+    document.getElementById('ci-cols').innerHTML = ciDetail || '';
     return false;
   }
 

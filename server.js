@@ -23,7 +23,7 @@ const donnees = {
   },
   sport: { html: '', detail: '' },
   studio: { html: '' },
-  cinema: { html: '' },
+  cinema: { html: '', detail: '' },
   menage: { compact: '', planning: '' },
 };
 const musique = {
@@ -484,9 +484,45 @@ function formatAbonnes(n) {
    ciné · films à l'affiche les mieux notés dans les cinémas
    configurés (pages horaires allociné, notes presse + spectateurs)
    ============================================================ */
+// parse une page horaires allociné → liste de films {titre, presse, spect, catalogue, score}
+function parseFilmsAllocine(html) {
+  const anneeCourante = new Date().getFullYear();
+  const films = [];
+  const cartes = html.split(/class="[^"]*movie-card/).slice(1);
+  for (const carte of cartes) {
+    const t = carte.match(/meta-title-link[^>]*>\s*([^<]+?)\s*</) ||
+      carte.match(/meta-title-link[^>]*title="([^"]+)"/);
+    if (!t || !t[1].trim()) continue;
+    const titre = decodeEntites(t[1].trim());
+    let presse = 0, spect = 0;
+    for (const bloc of carte.split(/class="[^"]*rating-item/).slice(1)) {
+      const nidx = bloc.indexOf('stareval-note');
+      if (nidx === -1) continue;
+      const note = bloc.slice(nidx).match(/stareval-note[^>]*>\s*([\d,.]+)/);
+      if (!note) continue;
+      const val = parseFloat(note[1].replace(',', '.'));
+      if (isNaN(val)) continue;
+      const avant = bloc.slice(0, nidx).toLowerCase();
+      if (avant.indexOf('spectateur') !== -1) spect = Math.max(spect, val);
+      else if (avant.indexOf('presse') !== -1) presse = Math.max(presse, val);
+    }
+    const dm = carte.match(/(?:janvier|f[eé]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[eé]cembre)\s+(\d{4})/i);
+    const annee = dm ? parseInt(dm[1], 10) : 0;
+    const cf = carte.match(/cfilm=(\d+)/);
+    const catalogue = /\breprise\b/i.test(carte.slice(0, 1500)) ||
+      (cf && parseInt(cf[1], 10) < 20000) || (annee && annee <= anneeCourante - 2);
+    const score = presse && spect ? (presse + spect) / 2 : (presse || spect);
+    films.push({ titre, presse, spect, catalogue: !!catalogue, score });
+  }
+  return films;
+}
+
 async function majCinema() {
   if (!Array.isArray(CFG.cinemas) || !CFG.cinemas.length) return;
-  const films = {}; // titre → meilleures notes vues dans les cinémas suivis
+  const notes = n => n.toFixed(1).replace('.', ',');
+  const agg = {};        // titre → notes agrégées + salles (pour l'arche)
+  const parCine = [];    // { nom, films:[...] } pour la vue détail 4 colonnes
+
   for (const cine of CFG.cinemas) {
     try {
       const r = await fetch('https://www.allocine.fr/seance/salle_gen_csalle=' + cine.allocine + '.html', {
@@ -496,73 +532,50 @@ async function majCinema() {
         },
       });
       if (!r.ok) throw new Error('allociné ' + r.status);
-      const html = await r.text();
-      // une "carte" par film sur la page horaires (classe tolérante : movie-card…)
-      const cartes = html.split(/class="[^"]*movie-card/).slice(1);
-      for (const carte of cartes) {
-        const t = carte.match(/meta-title-link[^>]*>\s*([^<]+?)\s*</) ||
-          carte.match(/meta-title-link[^>]*title="([^"]+)"/);
-        if (!t || !t[1].trim()) continue;
-        const titre = decodeEntites(t[1].trim());
-        const f = films[titre] || (films[titre] = { presse: 0, spect: 0, ou: [] });
-        if (f.ou.indexOf(cine.nom) === -1) f.ou.push(cine.nom);
-        // nouveauté ou reprise : la date de sortie du meta-body est le bon
-        // signal (l'id cfilm est trompeur — les gros films attendus ont un id
-        // bas des années avant leur sortie). filet pour les vrais classiques :
-        // un id allociné très bas (< 20000)
-        // date de sortie « 25 mars 2022 » : on ancre sur le nom du mois pour
-        // capter l'année, plus fiable qu'une fenêtre de caractères
-        const dm = carte.match(/(?:janvier|f[eé]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[eé]cembre)\s+(\d{4})/i);
-        if (dm) f.annee = Math.min(f.annee || 9999, parseInt(dm[1], 10));
-        if (/\breprise\b/i.test(carte.slice(0, 1500))) f.reprise = true;
-        const cf = carte.match(/cfilm=(\d+)/);
-        if (cf && parseInt(cf[1], 10) < 20000) f.vintage = true;
-        // notes lues bloc par bloc : chaque rating-item contient son libellé
-        // (presse/spectateurs) puis sa note, pas de contamination entre blocs
-        for (const bloc of carte.split(/class="[^"]*rating-item/).slice(1)) {
-          const nidx = bloc.indexOf('stareval-note');
-          if (nidx === -1) continue;
-          const note = bloc.slice(nidx).match(/stareval-note[^>]*>\s*([\d,.]+)/);
-          if (!note) continue;
-          const val = parseFloat(note[1].replace(',', '.'));
-          if (isNaN(val)) continue;
-          const avant = bloc.slice(0, nidx).toLowerCase();
-          if (avant.indexOf('spectateur') !== -1) f.spect = Math.max(f.spect, val);
-          else if (avant.indexOf('presse') !== -1) f.presse = Math.max(f.presse, val);
-        }
-      }
+      const films = parseFilmsAllocine(await r.text());
+      // par cinéma : les mieux notés (pour la colonne détail)
+      parCine.push({ nom: cine.nom, films: films.filter(f => f.score > 0).sort((a, b) => b.score - a.score).slice(0, 5) });
+      // agrégat pour l'arche
+      films.forEach(f => {
+        const a = agg[f.titre] || (agg[f.titre] = { presse: 0, spect: 0, catalogue: false, ou: [] });
+        a.presse = Math.max(a.presse, f.presse);
+        a.spect = Math.max(a.spect, f.spect);
+        if (f.catalogue) a.catalogue = true;
+        if (a.ou.indexOf(cine.nom) === -1) a.ou.push(cine.nom);
+      });
     } catch (e) { /* un cinéma muet n'empêche pas les autres */ }
   }
-  const notes = n => n.toFixed(1).replace('.', ',');
-  const anneeCourante = new Date().getFullYear();
-  const tous = Object.keys(films)
-    .map(titre => {
-      const f = films[titre];
-      const score = f.presse && f.spect ? (f.presse + f.spect) / 2 : (f.presse || f.spect);
-      // reprise : mention explicite, film vintage, ou sorti il y a ≥ 2 ans
-      const catalogue = !!f.reprise || !!f.vintage || (f.annee && f.annee <= anneeCourante - 2);
-      return { titre, presse: f.presse, spect: f.spect, ou: f.ou, catalogue, score };
-    })
-    .filter(f => f.score > 0)
-    .sort((a, b) => b.score - a.score);
+
+  const tous = Object.keys(agg).map(titre => {
+    const a = agg[titre];
+    const score = a.presse && a.spect ? (a.presse + a.spect) / 2 : (a.presse || a.spect);
+    return { titre, presse: a.presse, spect: a.spect, ou: a.ou, catalogue: a.catalogue, score };
+  }).filter(f => f.score > 0).sort((a, b) => b.score - a.score);
   if (!tous.length) throw new Error('aucun film noté trouvé');
 
-  // mix : les 2 meilleures nouveautés + les 2 meilleures reprises,
-  // complété par le meilleur reste si une catégorie manque
+  // arche : mix 2 meilleures nouveautés + 2 meilleures reprises
   const nouveautes = tous.filter(f => !f.catalogue).slice(0, 2);
   const reprises = tous.filter(f => f.catalogue).slice(0, 2);
   let sel = nouveautes.concat(reprises);
-  const reste = tous.filter(f => sel.indexOf(f) === -1);
-  sel = sel.concat(reste.slice(0, 4 - sel.length));
-
+  sel = sel.concat(tous.filter(f => sel.indexOf(f) === -1).slice(0, 4 - sel.length));
   donnees.cinema.html = sel.map(f => {
     const salles = f.ou.length > 2 ? f.ou.length + ' salles' : f.ou.join(' + ');
     const sous = [f.catalogue ? 'reprise' : '', salles,
-      f.presse ? 'presse ' + notes(f.presse) : '',
-      f.spect ? 'spect ' + notes(f.spect) : '']
+      f.presse ? 'presse ' + notes(f.presse) : '', f.spect ? 'spect ' + notes(f.spect) : '']
       .filter(Boolean).join(' · ');
     return item(f.titre.toLowerCase(), sous);
   }).join('\n');
+
+  // détail : une colonne par cinéma, films recommandés + notes
+  donnees.cinema.detail = parCine.map(c => {
+    const films = c.films.map(f => {
+      const no = [f.presse ? 'presse ' + notes(f.presse) : '', f.spect ? 'spect ' + notes(f.spect) : ''].filter(Boolean).join(' · ');
+      return '<div class="film"><div class="n">' + esc(f.titre) + '</div>' +
+        (f.catalogue ? '<span class="rep">reprise</span>' : '') +
+        (no ? '<div class="no">' + esc(no) + '</div>' : '') + '</div>';
+    }).join('');
+    return '<div class="cine"><div class="ch">' + esc(c.nom) + '</div>' + (films || '<div class="film"><div class="no">—</div></div>') + '</div>';
+  }).join('');
   sante.cinema = Date.now();
 }
 
@@ -783,6 +796,7 @@ const serveur = http.createServer(async (req, res) => {
         menagePlanning: donnees.menage.planning,
         agendaSemaines: donnees.agenda.semaines,
         sportDetail: donnees.sport.detail,
+        cinemaDetail: donnees.cinema.detail,
         figees: sourcesFigees(),
       });
 

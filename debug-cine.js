@@ -57,4 +57,18 @@ async function recupererHtml() {
       '· presse', presse || '-', '· spect', spect || '-',
       '·', cat ? 'REPRISE' : 'nouveauté', flag);
   });
+
+  // ---- diagnostic horaires de séances (pour la prochaine étape) ----
+  console.log('\n=== horaires ===');
+  console.log('occurrences · showtime :', (html.match(/showtime/gi) || []).length,
+    '· hour :', (html.match(/hour/gi) || []).length,
+    '· motif HH:MM :', (html.match(/\b([01]?\d|2[0-3])[:h][0-5]\d\b/g) || []).length);
+  const c0 = cartes.find(c => /meta-title-link/.test(c)) || '';
+  const sh = c0.search(/showtime|[01]?\d[:h][0-5]\d/i);
+  if (sh !== -1) {
+    const brut = c0.slice(sh, sh + 500).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    console.log('contexte horaires (carte 0) :', JSON.stringify(brut.slice(0, 300)));
+  } else {
+    console.log('aucun horaire repéré dans la carte 0 (les séances sont peut-être chargées en JS)');
+  }
 })().catch(e => console.log('erreur :', e.message));
