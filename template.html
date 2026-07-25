@@ -171,10 +171,17 @@
   #vue-cine .film .n { font-size:14.5px; font-weight:700; color:#3f3d34; line-height:1.2; }
   #vue-cine .film .no { font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#b96f45; margin-top:3px; }
   #vue-cine .film .rep { display:inline-block; font-size:9.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#fff; background:#b96f45; border-radius:5px; padding:1px 6px; margin-top:4px; }
+  #vue-cine .film .se { font-size:13px; color:#5a5749; margin-top:4px; line-height:1.35; }
+  #vue-cine .jours { position:absolute; left:48px; right:48px; top:112px; text-align:center; }
+  #vue-cine .jours span { display:inline-block; font-family:Georgia,serif; font-style:italic; font-size:16px; color:#a98a72; padding:5px 16px; margin:0 4px; border-radius:14px; }
+  #vue-cine .jours span.on { color:#fff; background:#b96f45; }
   .nuit #vue-cine { background:#2e2d28; }
   .nuit #vue-cine .cine { background:#38322c; }
   .nuit #vue-cine .film .n { color:#e2ddce; }
+  .nuit #vue-cine .film .se { color:#b3ad9c; }
   .nuit #vue-cine .ch { color:#c98b60; border-bottom-color:#4a4038; }
+  .nuit #vue-cine .jours span { color:#9c8874; }
+  .nuit #vue-cine .jours span.on { color:#fff; background:#a05a34; }
 
   /* arches tactiles : petit repère sous le titre */
   .arch.tap h3:after { content:''; display:block; width:22px; height:3px; border-radius:2px; background:currentColor; opacity:.35; margin:9px auto 0; }
@@ -439,6 +446,7 @@
   <div class="vue" id="vue-cine" style="display:none">
     <div class="retour" onclick="montrer('vue-principal')">accueil</div>
     <div class="titre-ecran">ciné</div>
+    <div class="jours" id="ci-jours"></div>
     <div class="cols" id="ci-cols"></div>
   </div>
 
@@ -590,7 +598,7 @@
             }
             if (d.agendaSemaines) { agSem = d.agendaSemaines; if (vueActive === 'vue-agenda') agRender(); }
             if (typeof d.sportDetail === 'string') { spDetail = d.sportDetail; if (vueActive === 'vue-sport') document.getElementById('sp-liste').innerHTML = spDetail; }
-            if (typeof d.cinemaDetail === 'string') { ciDetail = d.cinemaDetail; if (vueActive === 'vue-cine') document.getElementById('ci-cols').innerHTML = ciDetail; }
+            if (d.cinemaJours) { ciJours = d.cinemaJours; ciLabels = d.cinemaLabels || []; if (vueActive === 'vue-cine') ciRender(); }
             majSante(d.figees);
             premierContenu = false;
           } catch (e) {}
@@ -646,13 +654,21 @@
     return false;
   }
 
-  // ---- écran ciné : 4 colonnes pré-rendues par le serveur ----
-  var ciDetail = '';
-  function ouvrirCine() {
-    montrer('vue-cine');
-    document.getElementById('ci-cols').innerHTML = ciDetail || '';
-    return false;
+  // ---- écran ciné : 4 colonnes par jour (aujourd'hui / demain / surlendemain) ----
+  var ciJours = [], ciLabels = [], ciDay = 0;
+  function ciRender() {
+    var sel = document.getElementById('ci-jours'), cols = document.getElementById('ci-cols');
+    if (!ciJours.length) { sel.innerHTML = ''; cols.innerHTML = ''; return; }
+    if (ciDay > ciJours.length - 1) ciDay = 0;
+    var s = '';
+    for (var i = 0; i < ciLabels.length; i++) {
+      s += '<span class="' + (i === ciDay ? 'on' : '') + '" onclick="return ciSel(' + i + ')">' + ciLabels[i] + '</span>';
+    }
+    sel.innerHTML = s;
+    cols.innerHTML = ciJours[ciDay] || '';
   }
+  function ciSel(i) { ciDay = i; ciRender(); return false; }
+  function ouvrirCine() { ciDay = 0; montrer('vue-cine'); ciRender(); return false; }
 
   // filet de sécurité : en mode plein écran ios 9, le meta refresh est
   // parfois capricieux ; on force aussi le rechargement complet en js,

@@ -23,7 +23,7 @@ const donnees = {
   },
   sport: { html: '', detail: '' },
   studio: { html: '' },
-  cinema: { html: '', detail: '' },
+  cinema: { html: '', detailJours: [], joursLabel: [] },
   menage: { compact: '', planning: '' },
 };
 const musique = {
@@ -484,8 +484,9 @@ function formatAbonnes(n) {
    ciné · films à l'affiche les mieux notés dans les cinémas
    configurés (pages horaires allociné, notes presse + spectateurs)
    ============================================================ */
-// parse une page horaires allociné → liste de films {titre, presse, spect, catalogue, score}
-function parseFilmsAllocine(html) {
+// parse une page horaires allociné → films {titre, presse, spect, catalogue, score, seances}
+// joursISO = ['AAAA-MM-JJ' aujourd'hui, demain, après-demain] (heure de Paris)
+function parseFilmsAllocine(html, joursISO) {
   const anneeCourante = new Date().getFullYear();
   const films = [];
   const cartes = html.split(/class="[^"]*movie-card/).slice(1);
@@ -512,7 +513,16 @@ function parseFilmsAllocine(html) {
     const catalogue = /\breprise\b/i.test(carte.slice(0, 1500)) ||
       (cf && parseInt(cf[1], 10) < 20000) || (annee && annee <= anneeCourante - 2);
     const score = presse && spect ? (presse + spect) / 2 : (presse || spect);
-    films.push({ titre, presse, spect, catalogue: !!catalogue, score });
+    // séances : data-showtime-time="2026-07-26T10:45:00+02:00" (déjà en heure de Paris)
+    const seances = [[], [], []];
+    const sre = /data-showtime-time="(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/g;
+    let sm;
+    while ((sm = sre.exec(carte))) {
+      const idx = joursISO.indexOf(sm[1]);
+      if (idx !== -1 && seances[idx].indexOf(sm[2]) === -1) seances[idx].push(sm[2]);
+    }
+    seances.forEach(a => a.sort());
+    films.push({ titre, presse, spect, catalogue: !!catalogue, score, seances });
   }
   return films;
 }
@@ -523,6 +533,18 @@ async function majCinema() {
   const agg = {};        // titre → notes agrégées + salles (pour l'arche)
   const parCine = [];    // { nom, films:[...] } pour la vue détail 4 colonnes
 
+  // trois jours glissants (aujourd'hui, demain, surlendemain) en heure de paris
+  const JSEM = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'];
+  const p0 = parisParts(new Date());
+  const base = Date.UTC(+p0.year, +p0.month - 1, +p0.day, 12);
+  const joursISO = [], joursLabel = [];
+  for (let k = 0; k < 3; k++) {
+    const d = new Date(base + k * 86400000);
+    const pk = parisParts(d);
+    joursISO.push(pk.year + '-' + pk.month + '-' + pk.day);
+    joursLabel.push(k === 0 ? "aujourd'hui" : k === 1 ? 'demain' : JSEM[d.getUTCDay()] + ' ' + (+pk.day));
+  }
+
   for (const cine of CFG.cinemas) {
     try {
       const r = await fetch('https://www.allocine.fr/seance/salle_gen_csalle=' + cine.allocine + '.html', {
@@ -532,9 +554,9 @@ async function majCinema() {
         },
       });
       if (!r.ok) throw new Error('allociné ' + r.status);
-      const films = parseFilmsAllocine(await r.text());
-      // par cinéma : les mieux notés (pour la colonne détail)
-      parCine.push({ nom: cine.nom, films: films.filter(f => f.score > 0).sort((a, b) => b.score - a.score).slice(0, 5) });
+      const films = parseFilmsAllocine(await r.text(), joursISO);
+      // par cinéma : on garde tous les films notés (avec leurs séances par jour)
+      parCine.push({ nom: cine.nom, films: films.filter(f => f.score > 0).sort((a, b) => b.score - a.score) });
       // agrégat pour l'arche
       films.forEach(f => {
         const a = agg[f.titre] || (agg[f.titre] = { presse: 0, spect: 0, catalogue: false, ou: [] });
@@ -566,16 +588,22 @@ async function majCinema() {
     return item(f.titre.toLowerCase(), sous);
   }).join('\n');
 
-  // détail : une colonne par cinéma, films recommandés + notes
-  donnees.cinema.detail = parCine.map(c => {
-    const films = c.films.map(f => {
-      const no = [f.presse ? 'presse ' + notes(f.presse) : '', f.spect ? 'spect ' + notes(f.spect) : ''].filter(Boolean).join(' · ');
-      return '<div class="film"><div class="n">' + esc(f.titre) + '</div>' +
-        (f.catalogue ? '<span class="rep">reprise</span>' : '') +
-        (no ? '<div class="no">' + esc(no) + '</div>' : '') + '</div>';
+  // détail : pour chacun des 3 jours, une colonne par cinéma avec les séances du jour
+  donnees.cinema.joursLabel = joursLabel;
+  donnees.cinema.detailJours = joursISO.map((iso, off) => {
+    return parCine.map(c => {
+      const films = c.films.filter(f => f.seances[off] && f.seances[off].length)
+        .map(f => {
+          const no = [f.presse ? 'presse ' + notes(f.presse) : '', f.spect ? 'spect ' + notes(f.spect) : ''].filter(Boolean).join(' · ');
+          const se = f.seances[off].join(' · ');
+          return '<div class="film"><div class="n">' + esc(f.titre) + '</div>' +
+            (f.catalogue ? '<span class="rep">reprise</span>' : '') +
+            (no ? '<div class="no">' + esc(no) + '</div>' : '') +
+            '<div class="se">' + esc(se) + '</div></div>';
+        }).join('');
+      return '<div class="cine"><div class="ch">' + esc(c.nom) + '</div>' + (films || '<div class="film"><div class="no">—</div></div>') + '</div>';
     }).join('');
-    return '<div class="cine"><div class="ch">' + esc(c.nom) + '</div>' + (films || '<div class="film"><div class="no">—</div></div>') + '</div>';
-  }).join('');
+  });
   sante.cinema = Date.now();
 }
 
@@ -796,7 +824,8 @@ const serveur = http.createServer(async (req, res) => {
         menagePlanning: donnees.menage.planning,
         agendaSemaines: donnees.agenda.semaines,
         sportDetail: donnees.sport.detail,
-        cinemaDetail: donnees.cinema.detail,
+        cinemaJours: donnees.cinema.detailJours,
+        cinemaLabels: donnees.cinema.joursLabel,
         figees: sourcesFigees(),
       });
 
