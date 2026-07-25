@@ -64,11 +64,15 @@ async function recupererHtml() {
     '· hour :', (html.match(/hour/gi) || []).length,
     '· motif HH:MM :', (html.match(/\b([01]?\d|2[0-3])[:h][0-5]\d\b/g) || []).length);
   const c0 = cartes.find(c => /meta-title-link/.test(c)) || '';
-  const sh = c0.search(/showtime|[01]?\d[:h][0-5]\d/i);
-  if (sh !== -1) {
-    const brut = c0.slice(sh, sh + 500).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    console.log('contexte horaires (carte 0) :', JSON.stringify(brut.slice(0, 300)));
-  } else {
-    console.log('aucun horaire repéré dans la carte 0 (les séances sont peut-être chargées en JS)');
+  // sections par date (showtimes-anchor)
+  const anchors = c0.match(/showtimes-anchor[\s\S]{0,60}/g) || [];
+  console.log('sections date (carte 0) :', anchors.slice(0, 4).map(a => a.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40)));
+  // markup autour des 5 premières heures HH:MM de la carte 0 (classes tronquées)
+  const re = /([01]?\d|2[0-3])[:h][0-5]\d/g;
+  let m, n = 0;
+  while ((m = re.exec(c0)) && n < 5) {
+    let ctx = c0.slice(Math.max(0, m.index - 90), m.index + 12);
+    ctx = ctx.replace(/class="[^"]{25,}"/g, 'class="…"'); // masque les classes encodées à rallonge
+    console.log('heure ' + (++n) + ' :', JSON.stringify(ctx.slice(-95)));
   }
 })().catch(e => console.log('erreur :', e.message));
