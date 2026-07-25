@@ -118,6 +118,52 @@
   .nuit .menage { background:#38362f; }
   .nuit .menage .tache { color:#a89e88; }
 
+  /* ---------- écran de détail agenda (vue semaine navigable) ---------- */
+  #vue-agenda { background:#f6f1e8; }
+  #vue-agenda .titre-ecran { color:#3a4a2e; }
+  #vue-agenda .ag-nav { position:absolute; top:146px; left:0; right:0; text-align:center; }
+  #vue-agenda .ag-nav .rge { font-size:14px; font-weight:600; letter-spacing:.22em; text-transform:uppercase; color:#75815f; margin:0 22px; vertical-align:6px; }
+  #vue-agenda .fl { display:inline-block; width:46px; height:46px; border-radius:50%; border:1.5px solid #b9c0a6; position:relative; }
+  #vue-agenda .fl:before { content:''; position:absolute; left:18px; top:15px; border-style:solid; border-width:8px 10px 8px 0; border-color:transparent #75815f transparent transparent; }
+  #vue-agenda .fl.r:before { left:20px; border-width:8px 0 8px 10px; border-color:transparent transparent transparent #75815f; }
+  #vue-agenda .semaine { position:absolute; left:48px; right:48px; top:224px; bottom:40px; display:-webkit-flex; display:flex; }
+  #vue-agenda .jour { -webkit-flex:1; flex:1; margin:0 8px; }
+  #vue-agenda .jh { text-align:center; font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#8a7d66; padding-bottom:12px; border-bottom:2px solid #e4dcc9; }
+  #vue-agenda .jour.today .jh { color:#f4f0e4; background:#75815f; border-radius:14px; padding:10px 0; border:0; }
+  #vue-agenda .ev { background:#eef0e6; border-left:3px solid #75815f; border-radius:8px; padding:9px 10px; margin-top:12px; }
+  #vue-agenda .ev .h { font-size:11px; font-weight:700; letter-spacing:.08em; color:#75815f; }
+  #vue-agenda .ev .t { font-size:13.5px; font-weight:600; line-height:1.25; margin-top:3px; color:#3f3d34; }
+  #vue-agenda .ev.allday { border-left-color:#b96f45; }
+  #vue-agenda .ev.allday .h { color:#b96f45; }
+  .nuit #vue-agenda { background:#2e2d28; }
+  .nuit #vue-agenda .ev { background:#38362f; }
+  .nuit #vue-agenda .ev .t { color:#e2ddce; }
+  .nuit #vue-agenda .jh { color:#9b917d; border-bottom-color:#45423a; }
+
+  /* ---------- écran de détail sport (liste multi-jours) ---------- */
+  #vue-sport { background:#f6f1e8; }
+  #vue-sport .titre-ecran { color:#6a5a2e; }
+  #vue-sport .liste { position:absolute; left:120px; right:120px; top:160px; bottom:36px; overflow:hidden; }
+  #vue-sport .sect { font-size:12px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:#b08a3a; margin:18px 0 6px; }
+  #vue-sport .sect:first-child { margin-top:0; }
+  #vue-sport .match { display:-webkit-flex; display:flex; -webkit-align-items:center; align-items:center; background:#f0ead9; border-radius:12px; padding:13px 20px; margin-top:9px; }
+  #vue-sport .cal { width:70px; -webkit-flex:0 0 auto; flex:0 0 auto; text-align:center; }
+  #vue-sport .cal .j { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#a08a5a; }
+  #vue-sport .cal .h { font-size:17px; font-weight:700; color:#5a4a2a; }
+  #vue-sport .aff { -webkit-flex:1; flex:1; padding:0 20px; font-size:19px; font-weight:600; color:#3f3d34; }
+  #vue-sport .comp { font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:#a08a5a; -webkit-flex:0 0 auto; flex:0 0 auto; }
+  #vue-sport .pastille { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:10px; }
+  #vue-sport .pastille.foot { background:#5b7db8; }
+  #vue-sport .pastille.nba { background:#c9622b; }
+  #vue-sport .pastille.ufc { background:#8a3a3a; }
+  .nuit #vue-sport { background:#2e2d28; }
+  .nuit #vue-sport .match { background:#38362f; }
+  .nuit #vue-sport .aff { color:#e2ddce; }
+  .nuit #vue-sport .cal .h { color:#d8cdb0; }
+
+  /* arches tactiles : petit repère sous le titre */
+  .arch.tap h3:after { content:''; display:block; width:22px; height:3px; border-radius:2px; background:currentColor; opacity:.35; margin:9px auto 0; }
+
   /* ---------- musique ---------- */
   .music {
     position:absolute; top:172px; right:64px;
@@ -333,13 +379,13 @@
     <div class="menage {{MENAGE_CLASS}}" id="z-menage" onclick="montrer('vue-menage')">{{MENAGE_COMPACT}}</div>
 
     <div class="arches">
-      <div class="arch olive">
+      <div class="arch olive tap" onclick="return ouvrirAgenda()">
         <h3>aujourd'hui</h3>
         <div id="z-auj">{{AGENDA_AUJ}}</div>
         <div class="entete2">à venir</div>
         <div id="z-venir">{{AGENDA_VENIR}}</div>
       </div>
-      <div class="arch sable centre">
+      <div class="arch sable centre tap" onclick="return ouvrirSport()">
         <h3>sport</h3>
         <div id="z-sport">{{SPORT_ITEMS}}</div>
       </div>
@@ -356,6 +402,23 @@
     <div class="titre-ecran">ménage</div>
     <div class="legende"><b><span class="pt a"></span>Antoine</b><b><span class="pt i"></span>Inès</b></div>
     <div class="planning" id="z-menage-plan">{{MENAGE_PLANNING}}</div>
+  </div>
+
+  <div class="vue" id="vue-agenda" style="display:none">
+    <div class="retour" onclick="montrer('vue-principal')">accueil</div>
+    <div class="titre-ecran">agenda</div>
+    <div class="ag-nav">
+      <span class="fl" onclick="return agNav(-1)"></span>
+      <span class="rge" id="ag-label"></span>
+      <span class="fl r" onclick="return agNav(1)"></span>
+    </div>
+    <div class="semaine" id="ag-jours"></div>
+  </div>
+
+  <div class="vue" id="vue-sport" style="display:none">
+    <div class="retour" onclick="montrer('vue-principal')">accueil</div>
+    <div class="titre-ecran">sport</div>
+    <div class="liste" id="sp-liste"></div>
   </div>
 
   </div>
@@ -504,6 +567,8 @@
               dernier['z-menage-plan'] = d.menagePlanning;
               mp.innerHTML = d.menagePlanning;
             }
+            if (d.agendaSemaines) { agSem = d.agendaSemaines; if (vueActive === 'vue-agenda') agRender(); }
+            if (typeof d.sportDetail === 'string') { spDetail = d.sportDetail; if (vueActive === 'vue-sport') document.getElementById('sp-liste').innerHTML = spDetail; }
             majSante(d.figees);
             premierContenu = false;
           } catch (e) {}
@@ -537,6 +602,27 @@
   function reArmer() { if (vueActive !== 'vue-principal') planifierRetour(); }
   document.addEventListener('touchstart', reArmer, true);
   document.addEventListener('click', reArmer, true);
+
+  // ---- écran agenda : semaines pré-rendues par le serveur, navigation ‹ › ----
+  var agSem = [], agIdx = 1; // index 1 = cette semaine (les semaines vont de -1 à +6)
+  function agRender() {
+    var lab = document.getElementById('ag-label'), js = document.getElementById('ag-jours');
+    if (!agSem.length) { lab.innerHTML = 'chargement'; js.innerHTML = ''; return; }
+    if (agIdx < 0) agIdx = 0;
+    if (agIdx > agSem.length - 1) agIdx = agSem.length - 1;
+    lab.innerHTML = agSem[agIdx].label;
+    js.innerHTML = agSem[agIdx].html;
+  }
+  function agNav(delta) { agIdx += delta; agRender(); return false; }
+  function ouvrirAgenda() { agIdx = 1; montrer('vue-agenda'); agRender(); return false; }
+
+  // ---- écran sport : liste complète pré-rendue par le serveur ----
+  var spDetail = '';
+  function ouvrirSport() {
+    montrer('vue-sport');
+    document.getElementById('sp-liste').innerHTML = spDetail || '<div class="sect">chargement</div>';
+    return false;
+  }
 
   // filet de sécurité : en mode plein écran ios 9, le meta refresh est
   // parfois capricieux ; on force aussi le rechargement complet en js,

@@ -19,8 +19,9 @@ const donnees = {
   agenda: {
     auj: '<div class="it">chargement</div>',
     venir: '<div class="it">chargement</div>',
+    semaines: [],
   },
-  sport: { html: '' },
+  sport: { html: '', detail: '' },
   studio: { html: '' },
   cinema: { html: '' },
   menage: { compact: '', planning: '' },
@@ -188,6 +189,50 @@ async function majAgenda() {
   donnees.agenda.venir = venir.length
     ? venir.map(o => item(o.titre, quandLabel(o.date, o.allDay), o === prochaine)).join('\n')
     : item('semaine calme', 'rien devant');
+
+  // ---- vue détail : semaines -1 à +6, pré-rendues (iOS 9 n'a pas Intl client) ----
+  const p0 = parisParts(new Date());
+  const msBase = Date.UTC(+p0.year, +p0.month - 1, +p0.day, 12); // midi, à l'abri des bascules d'heure
+  const dowAuj = new Date(Date.UTC(+p0.year, +p0.month - 1, +p0.day)).getUTCDay(); // 0=dim..6=sam
+  const versLundi = (dowAuj === 0 ? -6 : 1 - dowAuj);
+  const JSEM = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
+  const MOISCOURT = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
+  const cleAujDetail = jourCle(new Date());
+
+  // occurrences sur une large fenêtre (semaine -1 à +6)
+  const occ2 = [];
+  const debut2 = new Date(msBase + (versLundi - 8) * 86400000);
+  const fin2 = new Date(msBase + (versLundi + 50) * 86400000);
+  for (const k of Object.keys(data)) {
+    const ev = data[k];
+    if (!ev || ev.type !== 'VEVENT') continue;
+    const ad = ev.datetype === 'date';
+    if (ev.rrule) ev.rrule.between(debut2, fin2, true).forEach(d => occ2.push({ date: d, titre: ev.summary, allDay: ad }));
+    else if (ev.start >= debut2 && ev.start <= fin2) occ2.push({ date: ev.start, titre: ev.summary, allDay: ad });
+  }
+
+  const semaines = [];
+  for (let w = -1; w <= 6; w++) {
+    const cols = [];
+    let lab1 = '', lab2 = '';
+    for (let jr = 0; jr < 7; jr++) {
+      const sd = new Date(msBase + (versLundi + w * 7 + jr) * 86400000);
+      const sp = parisParts(sd);
+      const cle = jourCle(sd);
+      const etiq = parseInt(sp.day, 10) + ' ' + MOISCOURT[+sp.month - 1];
+      if (jr === 0) lab1 = etiq;
+      if (jr === 6) lab2 = etiq;
+      const evs = occ2.filter(o => jourCle(o.date) === cle).sort((a, b) => a.date - b.date).slice(0, 4);
+      const cellEvs = evs.map(o =>
+        '<div class="ev' + (o.allDay ? ' allday' : '') + '"><div class="h">' +
+        esc(o.allDay ? 'journée' : heureLabel(o.date, false)) + '</div><div class="t">' + esc(o.titre) + '</div></div>'
+      ).join('');
+      cols.push('<div class="jour' + (cle === cleAujDetail ? ' today' : '') + '"><div class="jh">' +
+        esc(JSEM[jr] + ' ' + parseInt(sp.day, 10)) + '</div>' + cellEvs + '</div>');
+    }
+    semaines.push({ label: lab1 + ' – ' + lab2, html: cols.join('') });
+  }
+  donnees.agenda.semaines = semaines;
   sante.agenda = Date.now();
 }
 
@@ -223,13 +268,14 @@ async function footCandidats() {
   if (!CFG.footballDataKey || !Array.isArray(CFG.equipesFoot)) return out;
   for (const eq of CFG.equipesFoot) {
     try {
-      const j = await fdFetch('/teams/' + eq.id + '/matches?status=SCHEDULED&limit=1');
-      const m = j.matches && j.matches[0];
-      if (!m) continue;
-      const adv = m.homeTeam.id === eq.id ? m.awayTeam : m.homeTeam;
-      out.push({
-        date: new Date(m.utcDate),
-        titre: eq.nom + ' · ' + String(adv.shortName || adv.name || adv.tla || '').toLowerCase(),
+      const j = await fdFetch('/teams/' + eq.id + '/matches?status=SCHEDULED&limit=3');
+      (j.matches || []).forEach(m => {
+        const adv = m.homeTeam.id === eq.id ? m.awayTeam : m.homeTeam;
+        out.push({
+          date: new Date(m.utcDate), disc: 'foot',
+          comp: (m.competition && m.competition.name) ? m.competition.name.toLowerCase() : 'foot',
+          titre: eq.nom + ' · ' + String(adv.shortName || adv.name || adv.tla || '').toLowerCase(),
+        });
       });
     } catch (e) { /* une équipe en échec ne bloque pas les autres */ }
   }
@@ -244,17 +290,19 @@ async function nbaCandidats() {
     try {
       const j = await espnJson('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/' + eq.espn + '/schedule');
       const moi = String((j.team && j.team.id) || '');
-      const prochain = (j.events || [])
+      const prochains = (j.events || [])
         .filter(ev => new Date(ev.date) > new Date())
-        .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
-      if (!prochain) continue; // hors saison
-      let adv = '';
-      const comp = prochain.competitions && prochain.competitions[0];
-      if (comp && comp.competitors) {
-        const c = comp.competitors.find(c => String(c.team && c.team.id) !== moi);
-        if (c && c.team) adv = String(c.team.shortDisplayName || c.team.displayName || '').toLowerCase();
-      }
-      out.push({ date: new Date(prochain.date), titre: adv ? eq.nom + ' · ' + adv : eq.nom });
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .slice(0, 3);
+      prochains.forEach(prochain => {
+        let adv = '';
+        const comp = prochain.competitions && prochain.competitions[0];
+        if (comp && comp.competitors) {
+          const c = comp.competitors.find(c => String(c.team && c.team.id) !== moi);
+          if (c && c.team) adv = String(c.team.shortDisplayName || c.team.displayName || '').toLowerCase();
+        }
+        out.push({ date: new Date(prochain.date), disc: 'nba', comp: 'nba', titre: adv ? eq.nom + ' · ' + adv : eq.nom });
+      });
     } catch (e) { /* espn muet : on passe */ }
   }
   return out;
@@ -300,7 +348,7 @@ async function ufcCandidats() {
     } else {
       titre = 'ufc · ' + francais;
     }
-    out.push({ date: date, titre: titre, allDay: allDay });
+    out.push({ date: date, titre: titre, allDay: allDay, disc: 'ufc', comp: ppv ? 'ppv' : 'fight night' });
   }
   return out;
 }
@@ -320,6 +368,26 @@ async function majSport() {
     } catch (e) { /* rien */ }
   }
   donnees.sport.html = items.join('\n') || item('pas de match prévu', 'trêve');
+
+  // ---- vue détail : liste complète groupée cette semaine / à venir ----
+  const limite = Date.now() + 7 * 86400000;
+  const ligneSport = c => {
+    const p = parisParts(c.date);
+    const loin = c.date.getTime() - Date.now() > 6 * 86400000;
+    const jour = c.allDay
+      ? (loin ? parseInt(p.day, 10) + '/' + parseInt(p.month, 10) : p.weekday.replace('.', '') + ' ' + parseInt(p.day, 10))
+      : (loin ? parseInt(p.day, 10) + '/' + parseInt(p.month, 10) : p.weekday.replace('.', '') + ' ' + parseInt(p.day, 10));
+    const heure = c.allDay ? '' : parseInt(p.hour, 10) + ' h' + (p.minute !== '00' ? ' ' + p.minute : '');
+    return '<div class="match"><div class="cal"><div class="j">' + esc(jour) + '</div><div class="h">' + esc(heure || '—') + '</div></div>' +
+      '<div class="aff"><span class="pastille ' + (c.disc || '') + '"></span>' + esc(c.titre) + '</div>' +
+      '<div class="comp">' + esc(c.comp || '') + '</div></div>';
+  };
+  const sem = cands.filter(c => c.date.getTime() <= limite);
+  const apres = cands.filter(c => c.date.getTime() > limite);
+  let det = '';
+  if (sem.length) det += '<div class="sect">cette semaine</div>' + sem.map(ligneSport).join('');
+  if (apres.length) det += '<div class="sect">à venir</div>' + apres.map(ligneSport).join('');
+  donnees.sport.detail = det || '<div class="sect">pas de match prévu</div>';
   sante.sport = Date.now();
 }
 
@@ -713,6 +781,8 @@ const serveur = http.createServer(async (req, res) => {
         cinema: donnees.cinema.html,
         menageCompact: donnees.menage.compact,
         menagePlanning: donnees.menage.planning,
+        agendaSemaines: donnees.agenda.semaines,
+        sportDetail: donnees.sport.detail,
         figees: sourcesFigees(),
       });
 
