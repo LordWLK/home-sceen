@@ -5,8 +5,9 @@
    coller la sortie complète dans la conversation pour ajuster le parseur. */
 
 const fs = require('fs');
-const CODE = (process.argv[2] && !process.argv[2].startsWith('/')) ? process.argv[2] : 'P0086';
-const FICHIER = process.argv.find(a => a && a.startsWith('/'));
+const ARGS = process.argv.slice(2);
+const CODE = (ARGS[0] && !ARGS[0].startsWith('/')) ? ARGS[0] : 'P0086';
+const FICHIER = ARGS.find(a => a && a.startsWith('/'));
 
 function decodeEntites(s){return String(s||"").replace(/&#(\d+);/g,function(m,n){return String.fromCharCode(parseInt(n,10));}).replace(/&#x([0-9a-f]+);/gi,function(m,n){return String.fromCharCode(parseInt(n,16));}).replace(/&quot;/g,String.fromCharCode(34)).replace(/&apos;/g,String.fromCharCode(39)).replace(/&nbsp;/g," ").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");}
 
