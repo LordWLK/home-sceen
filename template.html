@@ -169,16 +169,16 @@
 
   /* ---------- écran de détail ciné (4 colonnes, une par cinéma) ---------- */
   #vue-cine { background:#f6f1e8; }
-  #vue-cine .titre-ecran { color:#8a4a28; }
-  #vue-cine .cols { position:absolute; left:48px; right:48px; top:158px; bottom:36px; display:-webkit-flex; display:flex; }
-  #vue-cine .cine { -webkit-flex:1; flex:1; margin:0 8px; background:#f3e7de; border-radius:16px; padding:16px 14px; }
-  #vue-cine .ch { text-align:center; font-family:Georgia,serif; font-style:italic; font-size:18px; color:#8a4a28; padding-bottom:12px; border-bottom:1px solid #e6cdbb; margin-bottom:6px; }
-  #vue-cine .film { margin-top:14px; }
+  #vue-cine .titre-ecran { color:#8a4a28; top:30px; font-size:38px; }
+  #vue-cine .cols { position:absolute; left:48px; right:48px; top:120px; bottom:22px; display:-webkit-flex; display:flex; }
+  #vue-cine .cine { -webkit-flex:1; flex:1; margin:0 8px; background:#f3e7de; border-radius:16px; padding:14px 14px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  #vue-cine .ch { text-align:center; font-family:Georgia,serif; font-style:italic; font-size:18px; color:#8a4a28; padding-bottom:10px; border-bottom:1px solid #e6cdbb; margin-bottom:4px; }
+  #vue-cine .film { margin-top:12px; }
   #vue-cine .film .n { font-size:14.5px; font-weight:700; color:#3f3d34; line-height:1.2; }
   #vue-cine .film .no { font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#b96f45; margin-top:3px; }
   #vue-cine .film .rep { display:inline-block; font-size:9.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#fff; background:#b96f45; border-radius:5px; padding:1px 6px; margin-top:4px; }
   #vue-cine .film .se { font-size:13px; color:#5a5749; margin-top:4px; line-height:1.35; }
-  #vue-cine .jours { position:absolute; left:48px; right:48px; top:112px; text-align:center; }
+  #vue-cine .jours { position:absolute; left:48px; right:48px; top:82px; text-align:center; }
   #vue-cine .jours span { display:inline-block; font-family:Georgia,serif; font-style:italic; font-size:16px; color:#a98a72; padding:5px 16px; margin:0 4px; border-radius:14px; }
   #vue-cine .jours span.on { color:#fff; background:#b96f45; }
   .nuit #vue-cine { background:#2e2d28; }

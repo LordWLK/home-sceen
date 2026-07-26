@@ -1,78 +1,68 @@
 /* diagnostic du parseur ciné · à lancer sur le vps :
-     node debug-cine.js /tmp/allo.html   → analyse un fichier téléchargé par curl
-     node debug-cine.js                  → va chercher la page allociné comme le serveur
+     node debug-cine.js            → sonde aujourd'hui + demain + surlendemain (code P0086 par défaut)
+     node debug-cine.js P0047      → autre cinéma
+     node debug-cine.js P0086 /tmp/allo.html → analyse un fichier déjà téléchargé (jour 0 seulement)
    coller la sortie complète dans la conversation pour ajuster le parseur. */
 
 const fs = require('fs');
-function decodeEntites(s){return String(s||"").replace(/&#(\d+);/g,function(m,n){return String.fromCharCode(parseInt(n,10));}).replace(/&#x([0-9a-f]+);/gi,function(m,n){return String.fromCharCode(parseInt(n,16));}).replace(/&quot;/g,String.fromCharCode(34)).replace(/&apos;/g,String.fromCharCode(39)).replace(/&nbsp;/g," ").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");}
-const CODE = process.argv[3] || 'P0086';
+const CODE = (process.argv[2] && !process.argv[2].startsWith('/')) ? process.argv[2] : 'P0086';
+const FICHIER = process.argv.find(a => a && a.startsWith('/'));
 
-async function recupererHtml() {
-  if (process.argv[2]) return fs.readFileSync(process.argv[2], 'utf8');
-  const r = await fetch('https://www.allocine.fr/seance/salle_gen_csalle=' + CODE + '.html', {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
-      'Accept-Language': 'fr-FR,fr;q=0.9',
-    },
+function decodeEntites(s){return String(s||"").replace(/&#(\d+);/g,function(m,n){return String.fromCharCode(parseInt(n,10));}).replace(/&#x([0-9a-f]+);/gi,function(m,n){return String.fromCharCode(parseInt(n,16));}).replace(/&quot;/g,String.fromCharCode(34)).replace(/&apos;/g,String.fromCharCode(39)).replace(/&nbsp;/g," ").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");}
+
+function url(off){const b='https://www.allocine.fr/seance/salle_gen_csalle='+CODE;return off===0?b+'.html':b+'/d-'+off+'/';}
+
+async function recupererHtml(u){
+  const r = await fetch(u, { headers: {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+    'Accept-Language': 'fr-FR,fr;q=0.9',
+  }});
+  return { status: r.status, html: await r.text() };
+}
+
+function datesShowtime(html){
+  const d = {};
+  const re = /data-showtime-time="(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/g;
+  let m;
+  while ((m = re.exec(html))) d[m[1]] = (d[m[1]] || 0) + 1;
+  return d;
+}
+
+function dumpFilms(html){
+  const cartes = html.split(/class="[^"]*movie-card/).slice(1);
+  console.log('  cartes :', cartes.length);
+  cartes.slice(0, 6).forEach((c) => {
+    const t = c.match(/meta-title-link[^>]*>\s*([^<]+?)\s*</) || c.match(/meta-title-link[^>]*title="([^"]+)"/);
+    if (!t || !t[1].trim()) return;
+    const heures = (c.match(/data-showtime-time="\d{4}-\d{2}-\d{2}T(\d{2}:\d{2})/g) || [])
+      .map(x => x.slice(-5));
+    console.log('   ·', JSON.stringify(decodeEntites(t[1].trim())), '→', heures.length, 'séances', heures.slice(0, 8).join(' '));
   });
-  console.log('http :', r.status);
-  return r.text();
 }
 
 (async () => {
-  const html = await recupererHtml();
-  console.log('taille :', html.length, 'octets');
-  console.log('occurrences · movie-card :', (html.match(/movie-card/g) || []).length,
-    '· stareval-note :', (html.match(/stareval-note/g) || []).length,
-    '· meta-title-link :', (html.match(/meta-title-link/g) || []).length,
-    '· rating-item :', (html.match(/rating-item/g) || []).length);
+  console.log('cinéma :', CODE, '\n');
 
-  // exactement le découpage et le parseur de server.js
-  const cartes = html.split(/class="[^"]*movie-card/).slice(1);
-  console.log('cartes découpées :', cartes.length, '\n');
+  if (FICHIER) {
+    const html = fs.readFileSync(FICHIER, 'utf8');
+    console.log('fichier :', FICHIER, '·', html.length, 'octets');
+    console.log('dates de séances trouvées :', datesShowtime(html));
+    dumpFilms(html);
+    return;
+  }
 
-  cartes.forEach((c, i) => {
-    const titres = (c.match(/meta-title-link[^>]*>\s*([^<]+?)\s*</g) || []).length;
-    const t = c.match(/meta-title-link[^>]*>\s*([^<]+?)\s*</) || c.match(/meta-title-link[^>]*title="([^"]+)"/);
-    if (!t || !t[1].trim()) return;
-    const cf = c.match(/cfilm=(\d+)/);
-    // année du meta-body, notes bloc par bloc — exactement comme server.js
-    const an = (c.match(/(?:janvier|f[eé]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[eé]cembre)\s+(\d{4})/i) || [])[1] || null;
-    let presse = 0, spect = 0;
-    for (const bloc of c.split(/class="[^"]*rating-item/).slice(1)) {
-      const nidx = bloc.indexOf('stareval-note');
-      if (nidx === -1) continue;
-      const note = bloc.slice(nidx).match(/stareval-note[^>]*>\s*([\d,.]+)/);
-      if (!note) continue;
-      const val = parseFloat(note[1].replace(',', '.'));
-      if (isNaN(val)) continue;
-      const avant = bloc.slice(0, nidx).toLowerCase();
-      if (avant.indexOf('spectateur') !== -1) spect = Math.max(spect, val);
-      else if (avant.indexOf('presse') !== -1) presse = Math.max(presse, val);
-    }
-    const cat = (cf && parseInt(cf[1], 10) < 20000) || (an && parseInt(an, 10) <= new Date().getFullYear() - 2);
-    const flag = titres > 1 ? '  <<< ' + titres + ' TITRES' : '';
-    console.log('carte', i, '·', JSON.stringify(decodeEntites(t[1].trim())),
-      '· cfilm', cf ? cf[1] : '?', '· année', an || '?',
-      '· presse', presse || '-', '· spect', spect || '-',
-      '·', cat ? 'REPRISE' : 'nouveauté', flag);
-  });
-
-  // ---- diagnostic horaires de séances (pour la prochaine étape) ----
-  console.log('\n=== horaires ===');
-  console.log('occurrences · showtime :', (html.match(/showtime/gi) || []).length,
-    '· hour :', (html.match(/hour/gi) || []).length,
-    '· motif HH:MM :', (html.match(/\b([01]?\d|2[0-3])[:h][0-5]\d\b/g) || []).length);
-  const c0 = cartes.find(c => /meta-title-link/.test(c)) || '';
-  // sections par date (showtimes-anchor)
-  const anchors = c0.match(/showtimes-anchor[\s\S]{0,60}/g) || [];
-  console.log('sections date (carte 0) :', anchors.slice(0, 4).map(a => a.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40)));
-  // markup autour des 5 premières heures HH:MM de la carte 0 (classes tronquées)
-  const re = /([01]?\d|2[0-3])[:h][0-5]\d/g;
-  let m, n = 0;
-  while ((m = re.exec(c0)) && n < 5) {
-    let ctx = c0.slice(Math.max(0, m.index - 90), m.index + 12);
-    ctx = ctx.replace(/class="[^"]{25,}"/g, 'class="…"'); // masque les classes encodées à rallonge
-    console.log('heure ' + (++n) + ' :', JSON.stringify(ctx.slice(-95)));
+  // on sonde les 3 jours et on regarde quelles dates de séances chaque page contient.
+  // objectif : confirmer que /d-1/ renvoie bien les séances de demain (et pas celles d'aujourd'hui).
+  for (let off = 0; off < 3; off++) {
+    const u = url(off);
+    console.log('=== jour +' + off + ' ===');
+    console.log('url :', u);
+    try {
+      const { status, html } = await recupererHtml(u);
+      console.log('http :', status, '·', html.length, 'octets');
+      console.log('dates de séances présentes :', datesShowtime(html));
+      dumpFilms(html);
+    } catch (e) { console.log('erreur :', e.message); }
+    console.log('');
   }
 })().catch(e => console.log('erreur :', e.message));
