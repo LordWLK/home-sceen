@@ -122,31 +122,70 @@ async function majMeteo() {
   const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + CFG.meteo.lat +
     '&longitude=' + CFG.meteo.lon +
     '&current=temperature_2m,weather_code' +
-    '&daily=temperature_2m_max,temperature_2m_min' +
-    '&hourly=precipitation_probability' +
-    '&forecast_days=1&timezone=' + encodeURIComponent(TZ);
+    '&daily=temperature_2m_max,temperature_2m_min,weather_code' +
+    '&hourly=precipitation_probability,temperature_2m' +
+    '&forecast_days=2&timezone=' + encodeURIComponent(TZ);
   const r = await fetch(u);
   const j = await r.json();
   const t = Math.round(j.current.temperature_2m);
   const tmax = Math.round(j.daily.temperature_2m_max[0]);
   const tmin = Math.round(j.daily.temperature_2m_min[0]);
+  const tmax2 = Math.round(j.daily.temperature_2m_max[1]);
+  const tmin2 = Math.round(j.daily.temperature_2m_min[1]);
+  const code2 = j.daily.weather_code[1];
 
-  // prochaine heure pluvieuse aujourd'hui (proba ≥ 50 %), en heure de paris
-  let pluie = '';
-  if (j.hourly && j.hourly.time) {
-    const n = parisParts(new Date());
-    const cleNow = n.year + '-' + n.month + '-' + n.day + 'T' + n.hour;
-    for (let i = 0; i < j.hourly.time.length; i++) {
-      if (j.hourly.time[i].slice(0, 13) < cleNow) continue;
-      if (j.hourly.precipitation_probability[i] >= 50) {
-        pluie = ' · pluie ' + parseInt(j.hourly.time[i].slice(11, 13), 10) + ' h';
-        break;
-      }
+  const n = parisParts(new Date());
+  const h = parseInt(n.hour, 10);
+  const cleAuj = n.year + '-' + n.month + '-' + n.day;
+  const cleNow = cleAuj + 'T' + n.hour;
+  // demain (clé AAAA-MM-JJ), calculé à midi utc pour éviter les bords d'heure d'été
+  const dem = parisParts(new Date(Date.UTC(+n.year, +n.month - 1, +n.day, 12) + 86400000));
+  const cleDem = dem.year + '-' + dem.month + '-' + dem.day;
+
+  const H = (j.hourly && j.hourly.time) ? j.hourly
+    : { time: [], precipitation_probability: [], temperature_2m: [] };
+  // prochaine heure de pluie (proba ≥ 50 %) à partir de fromKey, limitée à un jour si fourni
+  function prochainePluie(fromKey, jour) {
+    for (let i = 0; i < H.time.length; i++) {
+      if (H.time[i].slice(0, 13) < fromKey) continue;
+      if (jour && H.time[i].slice(0, 10) !== jour) continue;
+      if (H.precipitation_probability[i] >= 50) return parseInt(H.time[i].slice(11, 13), 10);
     }
+    return -1;
+  }
+  // température prévue à une heure précise d'un jour donné
+  function tempA(jour, heure) {
+    const cible = jour + 'T' + (heure < 10 ? '0' + heure : heure);
+    for (let i = 0; i < H.time.length; i++) {
+      if (H.time[i].slice(0, 13) === cible) return Math.round(H.temperature_2m[i]);
+    }
+    return null;
   }
 
+  // conseil sobre et adaptatif : matin → l'après-midi, après-midi → la soirée, soir → demain
+  let c1 = '', c2 = '';
+  if (h < 12) {
+    const rh = prochainePluie(cleNow, cleAuj);
+    c1 = 'après-midi ' + tmax + '°';
+    c2 = rh >= 0 ? 'pluie ' + rh + ' h'
+      : tmax >= 30 ? 'forte chaleur'
+      : tmin <= 8 ? 'matinée fraîche ' + tmin + '°'
+      : 'temps sec';
+  } else if (h < 18) {
+    const rh = prochainePluie(cleNow, cleAuj);
+    const ts = tempA(cleAuj, 21);
+    c1 = 'soirée ' + (ts != null ? ts : tmin) + '°';
+    c2 = rh >= 0 ? 'averses ' + rh + ' h' : 'au sec';
+  } else {
+    const rh = prochainePluie(cleDem, cleDem);
+    c1 = 'demain ' + tmin2 + '° / ' + tmax2 + '°';
+    c2 = rh >= 0 ? 'pluie ' + rh + ' h' : libelleMeteo(code2);
+  }
+  const conseil = [c1, c2].filter(Boolean).join(' · ');
+
   donnees.meteo.html = esc(libelleMeteo(j.current.weather_code)) + ' · <b>' + t + '°</b>' +
-    '<span class="mdetail">' + tmin + '° / ' + tmax + '°' + esc(pluie) + '</span>';
+    '<span class="mdetail">' + tmin + '° / ' + tmax + '°</span>' +
+    '<span class="mconseil">' + esc(conseil) + '</span>';
   sante.meteo = Date.now();
 }
 
