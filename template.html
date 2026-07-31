@@ -133,8 +133,8 @@
   #vue-agenda .fl:before { content:''; position:absolute; left:18px; top:15px; border-style:solid; border-width:8px 10px 8px 0; border-color:transparent #75815f transparent transparent; }
   #vue-agenda .fl.r:before { left:20px; border-width:8px 0 8px 10px; border-color:transparent transparent transparent #75815f; }
   #vue-agenda .semaine { position:absolute; left:48px; right:48px; top:224px; bottom:40px; display:-webkit-flex; display:flex; }
-  #vue-agenda .jour { -webkit-flex:1; flex:1; margin:0 8px; }
-  #vue-agenda .jh { text-align:center; font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#8a7d66; padding-bottom:12px; border-bottom:2px solid #e4dcc9; }
+  #vue-agenda .jour { -webkit-flex:1; flex:1; margin:0 8px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  #vue-agenda .jh { text-align:center; font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#8a7d66; padding-bottom:12px; border-bottom:2px solid #e4dcc9; position:-webkit-sticky; position:sticky; top:0; background:#f6f1e8; z-index:1; }
   #vue-agenda .jour.today .jh { color:#f4f0e4; background:#75815f; border-radius:14px; padding:10px 0; border:0; }
   #vue-agenda .ev { background:#eef0e6; border-left:3px solid #75815f; border-radius:8px; padding:9px 10px; margin-top:12px; }
   #vue-agenda .ev .h { font-size:11px; font-weight:700; letter-spacing:.08em; color:#75815f; }
@@ -153,7 +153,7 @@
   .nuit #vue-agenda .ev .t { color:#e2ddce; }
   .nuit #vue-agenda .ev .p.a { background:#8a9370; }
   .nuit #vue-agenda .ev .p.i { background:#c98b60; }
-  .nuit #vue-agenda .jh { color:#9b917d; border-bottom-color:#45423a; }
+  .nuit #vue-agenda .jh { color:#9b917d; border-bottom-color:#45423a; background:#2e2d28; }
   .nuit #vue-agenda .astuce { color:#7d7563; }
 
   /* ---------- écran de détail sport (liste multi-jours) ---------- */

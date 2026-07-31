@@ -293,7 +293,8 @@ async function majAgenda() {
       const etiq = parseInt(sp.day, 10) + ' ' + MOISCOURT[+sp.month - 1];
       if (jr === 0) lab1 = etiq;
       if (jr === 6) lab2 = etiq;
-      const evs = occ2.filter(o => jourCle(o.date) === cle).sort((a, b) => a.date - b.date).slice(0, 4);
+      // la colonne défile en interne : on peut afficher la journée entière (plafond large par sécurité)
+      const evs = occ2.filter(o => jourCle(o.date) === cle).sort((a, b) => a.date - b.date).slice(0, 12);
       const cellEvs = evs.map(o => {
         // un événement perso se touche pour l'épingler à l'accueil (ou l'en retirer)
         const epi = estPerso(o) && epingles[cleOcc(o)];
