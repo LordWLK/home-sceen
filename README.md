@@ -30,7 +30,9 @@ Pour afficher aussi les calendriers personnels, remplir `agendas` (qui prime sur
 ]
 ```
 
-Chaque calendrier perso suit le même chemin (Calendrier public → URL `webcal://` → `https://`). Les événements perso sont signés : suffixe `· antoine` dans l'arche, pastille de couleur (olive Antoine, terracotta Inès, comme le ménage) dans la vue semaine. Les événements `maison` restent sans signature. Un calendrier en panne n'empêche pas les autres de s'afficher.
+Chaque calendrier perso suit le même chemin (Calendrier public → URL `webcal://` → `https://`). Un calendrier en panne n'empêche pas les autres de s'afficher.
+
+**Où s'affichent-ils ?** L'arche de l'accueil ne montre que le calendrier `maison`. Les calendriers perso apparaissent dans l'écran agenda (vue semaine), signés d'une pastille (olive Antoine, terracotta Inès, comme le ménage). Pour faire remonter ponctuellement un événement perso sur l'accueil, toucher sa carte dans la vue semaine : il s'épingle (« · à l'accueil ») et apparaît dans l'arche avec son suffixe `· antoine` ; le retoucher l'en retire. Les épingles survivent aux redémarrages (`epingles.json`).
 
 Note : un calendrier public est lisible par quiconque a l'URL. Elle est illisible sans la connaître, même logique que le chemin secret de la page.
 

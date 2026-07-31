@@ -192,6 +192,18 @@ async function majMeteo() {
 /* ============================================================
    agenda · calendrier icloud publié (url ics), récurrences incluses
    ============================================================ */
+// épingles : événements perso choisis à la main (tap dans la vue semaine) pour
+// apparaître aussi dans l'arche. clé = ms de début + '|' + titre, persistées sur disque.
+const EPINGLES_PATH = path.join(__dirname, 'epingles.json');
+let epingles = {};
+try { epingles = JSON.parse(fs.readFileSync(EPINGLES_PATH, 'utf8')); } catch (e) { /* premier passage */ }
+function sauveEpingles() {
+  // purge des épingles d'événements passés depuis longtemps
+  const seuil = Date.now() - 45 * 86400000;
+  Object.keys(epingles).forEach(k => { if (+k.split('|')[0] < seuil) delete epingles[k]; });
+  try { fs.writeFileSync(EPINGLES_PATH, JSON.stringify(epingles)); } catch (e) { /* tant pis */ }
+}
+
 async function majAgenda() {
   // un ou plusieurs calendriers : config.agendas [{url, qui}], sinon l'ancien icsUrl seul.
   // qui : 'maison' (pas de signature), 'Antoine' ou 'Inès' (mêmes couleurs que le ménage)
@@ -233,9 +245,13 @@ async function majAgenda() {
     if (!o.qui || o.qui === 'maison') return '';
     return '<span class="p ' + (String(o.qui).toLowerCase().charAt(0) === 'i' ? 'i' : 'a') + '"></span>';
   };
+  const cleOcc = o => o.date.getTime() + '|' + o.titre;
+  const estPerso = o => o.qui && o.qui !== 'maison';
 
+  // l'arche ne montre que la maison + les événements perso épinglés à la main
   const occs = collecte(new Date(Date.now() - 2 * 3600000), // garde ce qui vient de commencer
-    new Date(Date.now() + 7 * 86400000));
+    new Date(Date.now() + 7 * 86400000))
+    .filter(o => !estPerso(o) || epingles[cleOcc(o)]);
 
   // la prochaine échéance à venir est mise en évidence (classe "next")
   const maintenant = Date.now();
@@ -278,11 +294,17 @@ async function majAgenda() {
       if (jr === 0) lab1 = etiq;
       if (jr === 6) lab2 = etiq;
       const evs = occ2.filter(o => jourCle(o.date) === cle).sort((a, b) => a.date - b.date).slice(0, 4);
-      const cellEvs = evs.map(o =>
-        '<div class="ev' + (o.allDay ? ' allday' : '') + '"><div class="h">' +
-        esc(o.allDay ? 'journée' : heureLabel(o.date, false)) + '</div><div class="t">' +
-        pastille(o) + esc(o.titre) + '</div></div>'
-      ).join('');
+      const cellEvs = evs.map(o => {
+        // un événement perso se touche pour l'épingler à l'accueil (ou l'en retirer)
+        const epi = estPerso(o) && epingles[cleOcc(o)];
+        const attr = estPerso(o)
+          ? ' onclick="return epingler(\'' + encodeURIComponent(cleOcc(o)).replace(/'/g, '%27') + '\')"'
+          : '';
+        return '<div class="ev' + (o.allDay ? ' allday' : '') + (epi ? ' epingle' : '') + '"' + attr +
+          '><div class="h">' + esc(o.allDay ? 'journée' : heureLabel(o.date, false)) +
+          (epi ? " · à l'accueil" : '') + '</div><div class="t">' +
+          pastille(o) + esc(o.titre) + '</div></div>';
+      }).join('');
       cols.push('<div class="jour' + (cle === cleAujDetail ? ' today' : '') + '"><div class="jh">' +
         esc(JSEM[jr] + ' ' + parseInt(sp.day, 10)) + '</div>' + cellEvs + '</div>');
     }
@@ -898,6 +920,17 @@ const serveur = http.createServer(async (req, res) => {
         cinemaLabels: donnees.cinema.joursLabel,
         figees: sourcesFigees(),
       });
+
+    } else if (route === '/agenda/epingle') {
+      // bascule l'épinglage d'un événement perso (clé passée encodée par la vue semaine)
+      const m = req.url.match(/[?&]k=([^&]+)/);
+      const k = m ? decodeURIComponent(m[1]) : '';
+      if (k) {
+        if (epingles[k]) delete epingles[k]; else epingles[k] = 1;
+        sauveEpingles();
+        majAgenda().catch(e => console.log('[maj] agenda en échec :', e.message));
+      }
+      json(res, { ok: !!k });
 
     } else if (route === '/musique/pause') {
       await spFetch(musique.playing ? '/me/player/pause' : '/me/player/play', 'PUT');

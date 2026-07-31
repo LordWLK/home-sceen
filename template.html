@@ -145,12 +145,16 @@
   #vue-agenda .ev .p { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:1px; }
   #vue-agenda .ev .p.a { background:#75815f; }
   #vue-agenda .ev .p.i { background:#b96f45; }
+  /* événement perso épinglé à l'accueil : bord renforcé (le libellé "· à l'accueil" le dit aussi) */
+  #vue-agenda .ev.epingle { border-left-width:7px; }
+  #vue-agenda .astuce { position:absolute; left:0; right:0; bottom:10px; text-align:center; font-family:Georgia,serif; font-style:italic; font-size:13px; color:#b3a78e; }
   .nuit #vue-agenda { background:#2e2d28; }
   .nuit #vue-agenda .ev { background:#38362f; }
   .nuit #vue-agenda .ev .t { color:#e2ddce; }
   .nuit #vue-agenda .ev .p.a { background:#8a9370; }
   .nuit #vue-agenda .ev .p.i { background:#c98b60; }
   .nuit #vue-agenda .jh { color:#9b917d; border-bottom-color:#45423a; }
+  .nuit #vue-agenda .astuce { color:#7d7563; }
 
   /* ---------- écran de détail sport (liste multi-jours) ---------- */
   #vue-sport { background:#f6f1e8; }
@@ -448,6 +452,7 @@
       <span class="fl r" onclick="return agNav(1)"></span>
     </div>
     <div class="semaine" id="ag-jours"></div>
+    <div class="astuce">toucher un événement à pastille pour l'afficher aussi sur l'accueil</div>
   </div>
 
   <div class="vue" id="vue-sport" style="display:none">
@@ -658,6 +663,16 @@
   }
   function agNav(delta) { agIdx += delta; agRender(); return false; }
   function ouvrirAgenda() { agIdx = 1; montrer('vue-agenda'); agRender(); return false; }
+  // épingle / désépingle un événement perso vers l'arche de l'accueil,
+  // puis rafraîchit le contenu (le serveur relit les calendriers)
+  function epingler(k) {
+    var x = new XMLHttpRequest();
+    x.open('GET', 'agenda/epingle?k=' + k + '&t=' + (new Date()).getTime(), true);
+    x.send();
+    setTimeout(pollContenu, 1200);
+    setTimeout(pollContenu, 3500);
+    return false;
+  }
 
   // ---- écran sport : liste complète pré-rendue par le serveur ----
   var spDetail = '';
