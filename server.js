@@ -118,6 +118,36 @@ function libelleMeteo(code) {
   for (const [c, l] of CODES_METEO) { if (code >= c) lbl = l; }
   return lbl;
 }
+// conseil météo adaptatif et amical : « info · geste », toujours avec l'heure des choses.
+// fonction pure et déterministe (pas d'aléatoire : la zone ne doit pas clignoter au poll).
+// v = { h, tmax, tmin, ts, rhAuj, tmin2, tmax2, rhDem, lblDem }
+//   h heure de paris · ts température prévue à 21 h (ou null)
+//   rhAuj / rhDem prochaine heure de pluie aujourd'hui / demain (-1 si aucune)
+function conseilMeteo(v) {
+  const pluieProche = v.rhAuj >= 0 && v.rhAuj <= v.h;
+  if (v.h < 12) {
+    // le matin, cap sur la journée
+    if (pluieProche) return "de la pluie dans l'heure · pense au parapluie";
+    if (v.rhAuj >= 0) return 'averses vers ' + v.rhAuj + ' h · pense au parapluie';
+    if (v.tmax >= 30) return "jusqu'à " + v.tmax + '° cet après-midi · sors léger, hydrate-toi';
+    if (v.tmin <= 10) return 'frais ce matin (' + v.tmin + '°) · une petite laine, ' + v.tmax + '° cet après-midi';
+    return 'journée au sec · ' + v.tmax + '° cet après-midi';
+  }
+  if (v.h < 18) {
+    // l'après-midi, cap sur la soirée
+    if (pluieProche) return "de la pluie dans l'heure · pense au parapluie";
+    if (v.rhAuj >= 0) return 'averses vers ' + v.rhAuj + ' h · prends le parapluie';
+    if (v.ts != null && (v.ts <= 16 || (v.tmax - v.ts >= 9 && v.ts <= 18))) return 'soirée à ' + v.ts + '° · prends un pull si tu sors';
+    return 'soirée au sec · ' + (v.ts != null ? v.ts : v.tmin) + '° vers 21 h';
+  }
+  // le soir : la fin de soirée d'abord, sinon demain
+  if (v.rhAuj >= 0) return 'ce soir, averses vers ' + v.rhAuj + ' h · parapluie si tu sors';
+  if (v.rhDem >= 0) return 'demain, pluie vers ' + v.rhDem + ' h · parapluie au départ';
+  if (v.tmax2 >= 30) return "demain jusqu'à " + v.tmax2 + '° · ferme les volets le matin';
+  if (v.tmax2 <= v.tmax - 6) return 'demain plus frais (' + v.tmin2 + '° / ' + v.tmax2 + '°) · couvre-toi';
+  return 'demain ' + v.tmin2 + '° / ' + v.tmax2 + '° · ' + v.lblDem;
+}
+
 async function majMeteo() {
   const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + CFG.meteo.lat +
     '&longitude=' + CFG.meteo.lon +
@@ -162,26 +192,14 @@ async function majMeteo() {
     return null;
   }
 
-  // conseil sobre et adaptatif : matin → l'après-midi, après-midi → la soirée, soir → demain
-  let c1 = '', c2 = '';
-  if (h < 12) {
-    const rh = prochainePluie(cleNow, cleAuj);
-    c1 = 'après-midi ' + tmax + '°';
-    c2 = rh >= 0 ? 'pluie ' + rh + ' h'
-      : tmax >= 30 ? 'forte chaleur'
-      : tmin <= 8 ? 'matinée fraîche ' + tmin + '°'
-      : 'temps sec';
-  } else if (h < 18) {
-    const rh = prochainePluie(cleNow, cleAuj);
-    const ts = tempA(cleAuj, 21);
-    c1 = 'soirée ' + (ts != null ? ts : tmin) + '°';
-    c2 = rh >= 0 ? 'averses ' + rh + ' h' : 'au sec';
-  } else {
-    const rh = prochainePluie(cleDem, cleDem);
-    c1 = 'demain ' + tmin2 + '° / ' + tmax2 + '°';
-    c2 = rh >= 0 ? 'pluie ' + rh + ' h' : libelleMeteo(code2);
-  }
-  const conseil = [c1, c2].filter(Boolean).join(' · ');
+  const conseil = conseilMeteo({
+    h: h, tmax: tmax, tmin: tmin,
+    ts: tempA(cleAuj, 21),
+    rhAuj: prochainePluie(cleNow, cleAuj),
+    rhDem: prochainePluie(cleDem, cleDem),
+    tmin2: tmin2, tmax2: tmax2,
+    lblDem: libelleMeteo(code2),
+  });
 
   donnees.meteo.html = esc(libelleMeteo(j.current.weather_code)) + ' · <b>' + t + '°</b>' +
     '<span class="mdetail">' + tmin + '° / ' + tmax + '°</span>' +
