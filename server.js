@@ -15,7 +15,7 @@ const TZ = 'Europe/Paris';
 
 /* ---------- état en mémoire ---------- */
 const donnees = {
-  meteo: { html: 'météo indisponible' },
+  meteo: { html: 'météo indisponible', soleil: null },
   agenda: {
     auj: '<div class="it">chargement</div>',
     venir: '<div class="it">chargement</div>',
@@ -152,7 +152,7 @@ async function majMeteo() {
   const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + CFG.meteo.lat +
     '&longitude=' + CFG.meteo.lon +
     '&current=temperature_2m,weather_code' +
-    '&daily=temperature_2m_max,temperature_2m_min,weather_code' +
+    '&daily=temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset' +
     '&hourly=precipitation_probability,temperature_2m' +
     '&forecast_days=2&timezone=' + encodeURIComponent(TZ);
   const r = await fetch(u);
@@ -200,6 +200,16 @@ async function majMeteo() {
     tmin2: tmin2, tmax2: tmax2,
     lblDem: libelleMeteo(code2),
   });
+
+  // lever / coucher du soleil (heure locale paris) en minutes depuis minuit,
+  // pour caler le mode nuit de l'ipad sur la vraie lumière du jour
+  const enMinutes = s => {
+    const m = String(s || '').match(/T(\d{2}):(\d{2})/);
+    return m ? (+m[1]) * 60 + (+m[2]) : null;
+  };
+  const lever = enMinutes(j.daily.sunrise && j.daily.sunrise[0]);
+  const coucher = enMinutes(j.daily.sunset && j.daily.sunset[0]);
+  donnees.meteo.soleil = (lever != null && coucher != null) ? { lever: lever, coucher: coucher } : null;
 
   donnees.meteo.html = esc(libelleMeteo(j.current.weather_code)) + ' · <b>' + t + '°</b>' +
     '<span class="mdetail">' + tmin + '° / ' + tmax + '°</span>' +
@@ -359,20 +369,36 @@ function sansAccents(s) {
   return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-// prochain match de chaque équipe de foot suivie (losc, milan, liverpool, france…)
+// matchs de chaque équipe de foot suivie (losc, milan, liverpool, france…) :
+// à venir (3 max par équipe) + résultats des 8 derniers jours (marqués resultat:true).
+// une seule requête par équipe (fenêtre -8 j → +70 j), l'api limite à 10 req/min
 async function footCandidats() {
   const out = [];
   if (!CFG.footballDataKey || !Array.isArray(CFG.equipesFoot)) return out;
+  const iso = ms => new Date(ms).toISOString().slice(0, 10);
+  const fenetre = '?dateFrom=' + iso(Date.now() - 8 * 86400000) + '&dateTo=' + iso(Date.now() + 70 * 86400000);
   for (const eq of CFG.equipesFoot) {
     try {
-      const j = await fdFetch('/teams/' + eq.id + '/matches?status=SCHEDULED&limit=3');
+      const j = await fdFetch('/teams/' + eq.id + '/matches' + fenetre);
+      let avenir = 0;
       (j.matches || []).forEach(m => {
-        const adv = m.homeTeam.id === eq.id ? m.awayTeam : m.homeTeam;
-        out.push({
-          date: new Date(m.utcDate), disc: 'foot',
-          comp: (m.competition && m.competition.name) ? m.competition.name.toLowerCase() : 'foot',
-          titre: eq.nom + ' · ' + String(adv.shortName || adv.name || adv.tla || '').toLowerCase(),
-        });
+        const comp = (m.competition && m.competition.name) ? m.competition.name.toLowerCase() : 'foot';
+        const ft = m.score && m.score.fullTime;
+        if (m.status === 'FINISHED' && ft && ft.home != null && ft.away != null) {
+          // résultat : affiché dans l'ordre domicile-extérieur avec le score
+          const nom = t => t.id === eq.id ? eq.nom : String(t.shortName || t.name || t.tla || '').toLowerCase();
+          out.push({
+            date: new Date(m.utcDate), disc: 'foot', comp: comp, resultat: true,
+            titre: nom(m.homeTeam) + ' ' + ft.home + '-' + ft.away + ' ' + nom(m.awayTeam),
+          });
+        } else if (m.status !== 'FINISHED' && new Date(m.utcDate) > new Date() && avenir < 3) {
+          avenir++;
+          const adv = m.homeTeam.id === eq.id ? m.awayTeam : m.homeTeam;
+          out.push({
+            date: new Date(m.utcDate), disc: 'foot', comp: comp,
+            titre: eq.nom + ' · ' + String(adv.shortName || adv.name || adv.tla || '').toLowerCase(),
+          });
+        }
       });
     } catch (e) { /* une équipe en échec ne bloque pas les autres */ }
   }
@@ -450,13 +476,29 @@ async function ufcCandidats() {
   return out;
 }
 
+// libellé relatif d'une date passée : "aujourd'hui", "hier", sinon "sam 26"
+function labelPasse(d) {
+  const cle = jourCle(d);
+  if (cle === jourCle(new Date())) return "aujourd'hui";
+  if (cle === jourCle(new Date(Date.now() - 86400000))) return 'hier';
+  const p = parisParts(d);
+  return p.weekday.replace('.', '') + ' ' + parseInt(p.day, 10);
+}
+
 async function majSport() {
   const cands = [];
   for (const source of [footCandidats, nbaCandidats, ufcCandidats]) {
     try { cands.push.apply(cands, await source()); } catch (e) { /* source muette */ }
   }
-  cands.sort((a, b) => a.date - b.date);
-  const items = cands.slice(0, 4).map(c => item(c.titre, quandLabel(c.date, !!c.allDay)));
+  // résultats récents d'un côté (du plus frais au plus ancien), matchs à venir de l'autre
+  const passes = cands.filter(c => c.resultat).sort((a, b) => b.date - a.date);
+  const futurs = cands.filter(c => !c.resultat).sort((a, b) => a.date - b.date);
+  // arche : le dernier résultat en tête (s'il y en a un), puis les prochains matchs
+  const items = [];
+  if (passes.length) {
+    items.push(item(passes[0].titre, labelPasse(passes[0].date) + (passes[0].comp ? ' · ' + passes[0].comp : '')));
+  }
+  futurs.slice(0, 4 - items.length).forEach(c => items.push(item(c.titre, quandLabel(c.date, !!c.allDay))));
   if (!items.length) {
     // repli : petit fichier édité à la main
     try {
@@ -479,9 +521,10 @@ async function majSport() {
       '<div class="aff"><span class="pastille ' + (c.disc || '') + '"></span>' + esc(c.titre) + '</div>' +
       '<div class="comp">' + esc(c.comp || '') + '</div></div>';
   };
-  const sem = cands.filter(c => c.date.getTime() <= limite);
-  const apres = cands.filter(c => c.date.getTime() > limite);
+  const sem = futurs.filter(c => c.date.getTime() <= limite);
+  const apres = futurs.filter(c => c.date.getTime() > limite);
   let det = '';
+  if (passes.length) det += '<div class="sect">derniers résultats</div>' + passes.slice(0, 4).map(ligneSport).join('');
   if (sem.length) det += '<div class="sect">cette semaine</div>' + sem.map(ligneSport).join('');
   if (apres.length) det += '<div class="sect">à venir</div>' + apres.map(ligneSport).join('');
   donnees.sport.detail = det || '<div class="sect">pas de match prévu</div>';
@@ -937,6 +980,7 @@ const serveur = http.createServer(async (req, res) => {
         sportDetail: donnees.sport.detail,
         cinemaJours: donnees.cinema.detailJours,
         cinemaLabels: donnees.cinema.joursLabel,
+        soleil: donnees.meteo.soleil,
         figees: sourcesFigees(),
       });
 

@@ -495,13 +495,16 @@
   var JOURS = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
   var MOIS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
   function pad(n) { return (n < 10 ? '0' : '') + n; }
+  // mode nuit calé sur le soleil : bornes en minutes depuis minuit, envoyées par
+  // le serveur (open-meteo) ; repli 21 h → 7 h tant que la première synchro n'est pas là
+  var soleil = { lever: 7 * 60, coucher: 21 * 60 };
   function tick() {
     var d = new Date();
     document.getElementById('clock').innerHTML = pad(d.getHours()) + ':' + pad(d.getMinutes());
     document.getElementById('date').innerHTML =
       JOURS[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()];
-    var h = d.getHours();
-    var nuit = (h >= 21 || h < 7);
+    var mn = d.getHours() * 60 + d.getMinutes();
+    var nuit = (mn >= soleil.coucher || mn < soleil.lever);
     document.body.className = nuit ? 'nuit' : '';
   }
   tick();
@@ -617,6 +620,7 @@
             if (d.agendaSemaines) { agSem = d.agendaSemaines; if (vueActive === 'vue-agenda') agRender(); }
             if (typeof d.sportDetail === 'string') { spDetail = d.sportDetail; if (vueActive === 'vue-sport') document.getElementById('sp-liste').innerHTML = spDetail; }
             if (d.cinemaJours) { ciJours = d.cinemaJours; ciLabels = d.cinemaLabels || []; if (vueActive === 'vue-cine') ciRender(); }
+            if (d.soleil && d.soleil.coucher) { soleil = d.soleil; tick(); }
             majSante(d.figees);
             premierContenu = false;
           } catch (e) {}
