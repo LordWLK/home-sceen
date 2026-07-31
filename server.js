@@ -193,25 +193,49 @@ async function majMeteo() {
    agenda · calendrier icloud publié (url ics), récurrences incluses
    ============================================================ */
 async function majAgenda() {
-  const data = await ical.async.fromURL(CFG.icsUrl);
-  const debut = new Date(Date.now() - 2 * 3600000); // garde ce qui vient de commencer
-  const fin = new Date(Date.now() + 7 * 86400000);
-  const occs = [];
+  // un ou plusieurs calendriers : config.agendas [{url, qui}], sinon l'ancien icsUrl seul.
+  // qui : 'maison' (pas de signature), 'Antoine' ou 'Inès' (mêmes couleurs que le ménage)
+  const cals = Array.isArray(CFG.agendas) && CFG.agendas.length
+    ? CFG.agendas
+    : [{ url: CFG.icsUrl, qui: 'maison' }];
+  const charges = await Promise.allSettled(cals.map(c => ical.async.fromURL(c.url)));
+  const jeux = [];
+  charges.forEach((r, i) => {
+    if (r.status === 'fulfilled') jeux.push({ data: r.value, qui: cals[i].qui || 'maison' });
+    else console.log('[maj] agenda', cals[i].qui || '#' + i, 'en échec :', r.reason.message);
+  });
+  if (!jeux.length) throw new Error('aucun calendrier joignable');
 
-  for (const k of Object.keys(data)) {
-    const ev = data[k];
-    if (!ev || ev.type !== 'VEVENT') continue;
-    const allDay = ev.datetype === 'date';
-    if (ev.rrule) {
-      // occurrences des événements récurrents (poubelles hebdo, etc.)
-      ev.rrule.between(debut, fin, true).forEach(d => {
-        occs.push({ date: d, titre: ev.summary, allDay: allDay });
-      });
-    } else if (ev.start >= debut && ev.start <= fin) {
-      occs.push({ date: ev.start, titre: ev.summary, allDay: allDay });
+  // occurrences de tous les calendriers dans une fenêtre, triées, signées par calendrier
+  const collecte = (debut, fin) => {
+    const out = [];
+    for (const jx of jeux) {
+      for (const k of Object.keys(jx.data)) {
+        const ev = jx.data[k];
+        if (!ev || ev.type !== 'VEVENT') continue;
+        const allDay = ev.datetype === 'date';
+        if (ev.rrule) {
+          // occurrences des événements récurrents (poubelles hebdo, etc.)
+          ev.rrule.between(debut, fin, true).forEach(d => {
+            out.push({ date: d, titre: ev.summary, allDay: allDay, qui: jx.qui });
+          });
+        } else if (ev.start >= debut && ev.start <= fin) {
+          out.push({ date: ev.start, titre: ev.summary, allDay: allDay, qui: jx.qui });
+        }
+      }
     }
-  }
-  occs.sort((a, b) => a.date - b.date);
+    out.sort((a, b) => a.date - b.date);
+    return out;
+  };
+  // signature d'un événement perso : suffixe texte (arche) et pastille (vue semaine)
+  const signe = o => o.qui && o.qui !== 'maison' ? ' · ' + String(o.qui).toLowerCase() : '';
+  const pastille = o => {
+    if (!o.qui || o.qui === 'maison') return '';
+    return '<span class="p ' + (String(o.qui).toLowerCase().charAt(0) === 'i' ? 'i' : 'a') + '"></span>';
+  };
+
+  const occs = collecte(new Date(Date.now() - 2 * 3600000), // garde ce qui vient de commencer
+    new Date(Date.now() + 7 * 86400000));
 
   // la prochaine échéance à venir est mise en évidence (classe "next")
   const maintenant = Date.now();
@@ -223,10 +247,10 @@ async function majAgenda() {
   const venir = occs.filter(o => jourCle(o.date) !== cleAuj).slice(0, 2);
 
   donnees.agenda.auj = auj.length
-    ? auj.map(o => item(o.titre, heureLabel(o.date, o.allDay), o === prochaine)).join('\n')
+    ? auj.map(o => item(o.titre, heureLabel(o.date, o.allDay) + signe(o), o === prochaine)).join('\n')
     : item('rien de prévu', 'journée libre');
   donnees.agenda.venir = venir.length
-    ? venir.map(o => item(o.titre, quandLabel(o.date, o.allDay), o === prochaine)).join('\n')
+    ? venir.map(o => item(o.titre, quandLabel(o.date, o.allDay) + signe(o), o === prochaine)).join('\n')
     : item('semaine calme', 'rien devant');
 
   // ---- vue détail : semaines -1 à +6, pré-rendues (iOS 9 n'a pas Intl client) ----
@@ -238,17 +262,9 @@ async function majAgenda() {
   const MOISCOURT = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
   const cleAujDetail = jourCle(new Date());
 
-  // occurrences sur une large fenêtre (semaine -1 à +6)
-  const occ2 = [];
-  const debut2 = new Date(msBase + (versLundi - 8) * 86400000);
-  const fin2 = new Date(msBase + (versLundi + 50) * 86400000);
-  for (const k of Object.keys(data)) {
-    const ev = data[k];
-    if (!ev || ev.type !== 'VEVENT') continue;
-    const ad = ev.datetype === 'date';
-    if (ev.rrule) ev.rrule.between(debut2, fin2, true).forEach(d => occ2.push({ date: d, titre: ev.summary, allDay: ad }));
-    else if (ev.start >= debut2 && ev.start <= fin2) occ2.push({ date: ev.start, titre: ev.summary, allDay: ad });
-  }
+  // occurrences sur une large fenêtre (semaine -1 à +6), tous calendriers
+  const occ2 = collecte(new Date(msBase + (versLundi - 8) * 86400000),
+    new Date(msBase + (versLundi + 50) * 86400000));
 
   const semaines = [];
   for (let w = -1; w <= 6; w++) {
@@ -264,7 +280,8 @@ async function majAgenda() {
       const evs = occ2.filter(o => jourCle(o.date) === cle).sort((a, b) => a.date - b.date).slice(0, 4);
       const cellEvs = evs.map(o =>
         '<div class="ev' + (o.allDay ? ' allday' : '') + '"><div class="h">' +
-        esc(o.allDay ? 'journée' : heureLabel(o.date, false)) + '</div><div class="t">' + esc(o.titre) + '</div></div>'
+        esc(o.allDay ? 'journée' : heureLabel(o.date, false)) + '</div><div class="t">' +
+        pastille(o) + esc(o.titre) + '</div></div>'
       ).join('');
       cols.push('<div class="jour' + (cle === cleAujDetail ? ' today' : '') + '"><div class="jh">' +
         esc(JSEM[jr] + ' ' + parseInt(sp.day, 10)) + '</div>' + cellEvs + '</div>');

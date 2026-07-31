@@ -3,6 +3,10 @@
   "basePath": "/maison-x7k2p",
 
   "icsUrl": "https://pXX-caldav.icloud.com/published/2/COLLER_ICI_L_URL_PUBLIQUE",
+  "agendas": [
+    { "url": "https://pXX-caldav.icloud.com/published/2/CALENDRIER_MAISON", "qui": "maison" },
+    { "url": "https://pXX-caldav.icloud.com/published/2/CALENDRIER_ANTOINE", "qui": "Antoine" }
+  ],
 
   "meteo": { "lat": 50.63, "lon": 3.06 },
 

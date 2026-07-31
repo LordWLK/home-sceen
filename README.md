@@ -18,6 +18,20 @@ Sur Mac ou iPhone, app Calendrier : sélectionner le calendrier partagé avec In
 
 Dans `config.json`, coller cette URL dans `icsUrl` en remplaçant `webcal://` par `https://`.
 
+### plusieurs calendriers (maison + persos)
+
+Pour afficher aussi les calendriers personnels, remplir `agendas` (qui prime sur `icsUrl`) :
+
+```json
+"agendas": [
+  { "url": "https://…/published/…", "qui": "maison" },
+  { "url": "https://…/published/…", "qui": "Antoine" },
+  { "url": "https://…/published/…", "qui": "Inès" }
+]
+```
+
+Chaque calendrier perso suit le même chemin (Calendrier public → URL `webcal://` → `https://`). Les événements perso sont signés : suffixe `· antoine` dans l'arche, pastille de couleur (olive Antoine, terracotta Inès, comme le ménage) dans la vue semaine. Les événements `maison` restent sans signature. Un calendrier en panne n'empêche pas les autres de s'afficher.
+
 Note : un calendrier public est lisible par quiconque a l'URL. Elle est illisible sans la connaître, même logique que le chemin secret de la page.
 
 ## 3 · spotify (une fois, depuis ton PC)
