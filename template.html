@@ -444,6 +444,51 @@
   .nuit.m-fete .arch.sable { background:#b09a5e; }
   .nuit.m-fete .date .fete { color:#c9a95c; }
 
+  /* ---------- ornements suspendus des jours de fête (css pur) ---------- */
+  /* des fils tombent du bord haut, dans les deux respirations qui encadrent
+     le pendentif ; chaque thème y accroche son ornement, avec un léger balancement */
+  .deco-fete { display:none; position:absolute; left:0; top:0; width:1024px; height:210px; pointer-events:none; }
+  .m-noel .deco-fete, .m-coeur .deco-fete, .m-fete .deco-fete { display:block; }
+  .deco-fete .fil { position:absolute; top:0; width:2px; background:rgba(53,52,45,.20); -webkit-transform-origin:top center; transform-origin:top center; }
+  .nuit .deco-fete .fil { background:rgba(232,226,211,.16); }
+  .deco-fete .f1 { left:338px; height:56px; }
+  .deco-fete .f2 { left:374px; height:94px; }
+  .deco-fete .f3 { left:656px; height:102px; }
+  .deco-fete .f4 { left:704px; height:60px; }
+  .deco-fete .f5 { left:756px; height:126px; }
+  @-webkit-keyframes balance { 0% { -webkit-transform:rotate(2.2deg); } 100% { -webkit-transform:rotate(-2.2deg); } }
+  @keyframes balance { 0% { transform:rotate(2.2deg); } 100% { transform:rotate(-2.2deg); } }
+  .deco-fete .fil { -webkit-animation:balance 3.8s ease-in-out infinite alternate; animation:balance 3.8s ease-in-out infinite alternate; }
+  .deco-fete .f2 { -webkit-animation-duration:4.6s; animation-duration:4.6s; }
+  .deco-fete .f3 { -webkit-animation-duration:5.2s; animation-duration:5.2s; }
+  .deco-fete .f4 { -webkit-animation-duration:4.1s; animation-duration:4.1s; }
+  .deco-fete .f5 { -webkit-animation-duration:4.9s; animation-duration:4.9s; }
+  .deco-fete .orn { position:absolute; left:50%; }
+  /* noël : boules (attache dorée, ombre douce) */
+  .m-noel .orn { bottom:-20px; width:20px; height:20px; margin-left:-10px; border-radius:50%; box-shadow:inset -3px -4px 0 rgba(0,0,0,.10); }
+  .m-noel .orn:before { content:''; position:absolute; left:50%; top:-4px; width:6px; height:4px; margin-left:-3px; border-radius:1.5px; background:#c9a95c; }
+  .m-noel .f1 .orn { background:#a03d2e; }
+  .m-noel .f2 .orn { background:#55654a; width:15px; height:15px; margin-left:-8px; bottom:-15px; }
+  .m-noel .f3 .orn { background:#c9a95c; }
+  .m-noel .f4 .orn { background:#55654a; width:14px; height:14px; margin-left:-7px; bottom:-14px; }
+  .m-noel .f5 .orn { background:#a03d2e; width:25px; height:25px; margin-left:-13px; bottom:-25px; }
+  /* saint-valentin : cœurs suspendus, deux tailles */
+  .m-coeur .orn { bottom:-17px; width:11px; height:11px; margin-left:-6px; background:#ab4a52; -webkit-transform:rotate(45deg); transform:rotate(45deg); }
+  .m-coeur .orn:before, .m-coeur .orn:after { content:''; position:absolute; width:11px; height:11px; border-radius:50%; background:inherit; }
+  .m-coeur .orn:before { left:-6px; top:0; }
+  .m-coeur .orn:after { left:0; top:-6px; }
+  .m-coeur .f2 .orn, .m-coeur .f4 .orn { width:8px; height:8px; margin-left:-4px; bottom:-13px; background:#c9737e; }
+  .m-coeur .f2 .orn:before, .m-coeur .f2 .orn:after, .m-coeur .f4 .orn:before, .m-coeur .f4 .orn:after { width:8px; height:8px; }
+  .m-coeur .f2 .orn:before, .m-coeur .f4 .orn:before { left:-4px; top:0; }
+  .m-coeur .f2 .orn:after, .m-coeur .f4 .orn:after { left:0; top:-4px; }
+  /* grande occasion : sequins losanges (doré, olive, terracotta) */
+  .m-fete .orn { bottom:-17px; width:13px; height:13px; margin-left:-7px; -webkit-transform:rotate(45deg); transform:rotate(45deg); }
+  .m-fete .f1 .orn { background:#c9a95c; }
+  .m-fete .f2 .orn { background:#75815f; width:10px; height:10px; margin-left:-5px; bottom:-14px; }
+  .m-fete .f3 .orn { background:#b96f45; }
+  .m-fete .f4 .orn { background:#c9a95c; width:10px; height:10px; margin-left:-5px; bottom:-14px; }
+  .m-fete .f5 .orn { background:#9a7b2c; width:15px; height:15px; margin-left:-8px; bottom:-19px; }
+
   /* petit motif dessiné en css à côté du vœu (aucun émoji) */
   .date .fete .deco { display:none; }
   /* sapin (deux triangles empilés) */
@@ -472,6 +517,14 @@
   <div id="stage">
 
   <div class="vue" id="vue-principal">
+
+    <div class="deco-fete">
+      <span class="fil f1"><span class="orn"></span></span>
+      <span class="fil f2"><span class="orn"></span></span>
+      <span class="fil f3"><span class="orn"></span></span>
+      <span class="fil f4"><span class="orn"></span></span>
+      <span class="fil f5"><span class="orn"></span></span>
+    </div>
 
     <div class="head">la maison · lille</div>
     <div class="sante" id="sante"></div>
