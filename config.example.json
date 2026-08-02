@@ -23,7 +23,11 @@
     { "espn": "ny", "nom": "knicks" }
   ],
 
-  "ufcFrancais": ["gane", "saint denis", "imavov", "fiorot", "ziam", "gomis", "charriere", "lapilus"],
+  "mma": [
+    { "espn": "ufc", "nom": "ufc" },
+    { "espn": "pfl", "nom": "pfl" }
+  ],
+  "mmaFrancais": ["gane", "saint denis", "imavov", "fiorot", "ziam", "gomis", "charriere", "lapilus", "doumbe", "baki"],
 
   "instagram": "yum.ines",
   "abonnesManuel": 0,

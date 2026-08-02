@@ -431,47 +431,56 @@ async function nbaCandidats() {
   return out;
 }
 
-// ufc : les événements numérotés (gros combats) s'affichent toujours,
-// les fight nights seulement si un combattant de CFG.ufcFrancais est à la carte
-async function ufcCandidats() {
+// mma : tous les événements des organisations suivies (config.mma, par défaut ufc + pfl
+// via l'api espn). titre = tête d'affiche du calendrier ("ufc 324 · makhachev-gaethje") ;
+// un combattant de config.mmaFrancais (repli ufcFrancais) à la carte est signalé en plus
+// s'il n'est pas déjà dans le titre. ksw / ares / hexagone : pas d'api fiable, passer
+// par les événements manuels d'events.json (fusionnés dans majSport).
+async function mmaCandidats() {
   const out = [];
-  if (!Array.isArray(CFG.ufcFrancais)) return out;
-  const sb = await espnJson('https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard');
-  const cal = (((sb.leagues || [])[0] || {}).calendar) || [];
-  for (const c of cal) {
-    const brut = new Date(c.startDate || c);
-    if (isNaN(brut) || brut < new Date(Date.now() - 12 * 3600000) ||
-        brut > new Date(Date.now() + 35 * 86400000)) continue;
-    const label = String(c.label || '');
-    const ppv = label.match(/^(UFC\s+\d+)/i);
-    // carte du jour : date réelle de l'événement et détection d'un français suivi
-    let date = brut, allDay = true, francais = '';
+  const ligues = Array.isArray(CFG.mma) && CFG.mma.length
+    ? CFG.mma
+    : [{ espn: 'ufc', nom: 'ufc' }, { espn: 'pfl', nom: 'pfl' }];
+  const suivis = CFG.mmaFrancais || CFG.ufcFrancais || [];
+  for (const lg of ligues) {
     try {
-      const ymd = brut.toISOString().slice(0, 10).replace(/-/g, '');
-      const jour = await espnJson('https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates=' + ymd);
-      (jour.events || []).forEach(ev => {
-        if (ev.date) { date = new Date(ev.date); allDay = false; }
-        (ev.competitions || []).forEach(co => {
-          (co.competitors || []).forEach(a => {
-            const nom = sansAccents((a.athlete && a.athlete.displayName) || '').toLowerCase();
-            const hit = CFG.ufcFrancais.find(f => nom.indexOf(sansAccents(f).toLowerCase()) !== -1);
-            if (hit && !francais) francais = hit;
+      const sb = await espnJson('https://site.api.espn.com/apis/site/v2/sports/mma/' + lg.espn + '/scoreboard');
+      const cal = (((sb.leagues || [])[0] || {}).calendar) || [];
+      for (const c of cal) {
+        const brut = new Date(c.startDate || c);
+        if (isNaN(brut) || brut < new Date(Date.now() - 12 * 3600000) ||
+            brut > new Date(Date.now() + 35 * 86400000)) continue;
+        const label = String(c.label || '');
+        const num = label.match(new RegExp('^' + lg.nom + '\\s+(\\d+)', 'i'));
+        // tête d'affiche depuis le libellé du calendrier ("Org…: A vs. B")
+        const tete = sansAccents(label.split(':')[1] || '').trim().toLowerCase()
+          .replace(/\s+vs\.?\s+/i, '-').replace(/\./g, '');
+        // carte du jour : date réelle de l'événement et détection d'un français suivi
+        let date = brut, allDay = true, francais = '';
+        try {
+          const ymd = brut.toISOString().slice(0, 10).replace(/-/g, '');
+          const jour = await espnJson('https://site.api.espn.com/apis/site/v2/sports/mma/' + lg.espn + '/scoreboard?dates=' + ymd);
+          (jour.events || []).forEach(ev => {
+            if (ev.date) { date = new Date(ev.date); allDay = false; }
+            (ev.competitions || []).forEach(co => {
+              (co.competitors || []).forEach(a => {
+                const nom = sansAccents((a.athlete && a.athlete.displayName) || '').toLowerCase();
+                const hit = suivis.find(f => nom.indexOf(sansAccents(f).toLowerCase()) !== -1);
+                if (hit && !francais) francais = hit;
+              });
+            });
           });
+        } catch (e) { /* on garde la date du calendrier, sans heure */ }
+        const orgTag = num ? lg.nom + ' ' + num[1] : lg.nom;
+        const titre = tete ? orgTag + ' · ' + tete : orgTag;
+        out.push({
+          date: date, titre: titre, allDay: allDay, disc: 'ufc',
+          comp: lg.nom === 'ufc' ? (num ? 'ppv' : 'fight night') : lg.nom,
+          // signalé seulement s'il n'est pas déjà la tête d'affiche
+          francais: francais && titre.indexOf(sansAccents(francais).toLowerCase()) === -1 ? francais : '',
         });
-      });
-    } catch (e) { /* on garde la date du calendrier, sans heure */ }
-    if (!ppv && !francais) continue;
-    let titre;
-    if (ppv && francais) {
-      titre = ppv[1].toLowerCase() + ' · ' + francais;
-    } else if (ppv) {
-      const tete = sansAccents(label.split(':')[1] || '').trim().toLowerCase()
-        .replace(/\s+vs\.?\s+/, '-').replace(/\./g, '');
-      titre = tete ? ppv[1].toLowerCase() + ' · ' + tete : ppv[1].toLowerCase();
-    } else {
-      titre = 'ufc · ' + francais;
-    }
-    out.push({ date: date, titre: titre, allDay: allDay, disc: 'ufc', comp: ppv ? 'ppv' : 'fight night' });
+      }
+    } catch (e) { /* ligue muette (api absente ou en panne) : on passe */ }
   }
   return out;
 }
@@ -487,9 +496,19 @@ function labelPasse(d) {
 
 async function majSport() {
   const cands = [];
-  for (const source of [footCandidats, nbaCandidats, ufcCandidats]) {
+  for (const source of [footCandidats, nbaCandidats, mmaCandidats]) {
     try { cands.push.apply(cands, await source()); } catch (e) { /* source muette */ }
   }
+  // événements ajoutés à la main dans events.json (ksw, ares, hexagone… sans api) :
+  // une entrée avec "date" est fusionnée au flux normal
+  let manuels = [];
+  try { manuels = JSON.parse(fs.readFileSync(path.join(__dirname, 'events.json'), 'utf8')); } catch (e) { /* pas de fichier */ }
+  manuels.forEach(e => {
+    if (!e || !e.date || !e.titre) return;
+    const d = new Date(e.date);
+    if (isNaN(d) || d < new Date(Date.now() - 12 * 3600000)) return;
+    cands.push({ date: d, titre: e.titre, comp: e.comp || '', disc: e.disc || 'ufc', allDay: !/T\d/.test(String(e.date)) });
+  });
   // résultats récents d'un côté (du plus frais au plus ancien), matchs à venir de l'autre
   const passes = cands.filter(c => c.resultat).sort((a, b) => b.date - a.date);
   const futurs = cands.filter(c => !c.resultat).sort((a, b) => a.date - b.date);
@@ -498,12 +517,13 @@ async function majSport() {
   if (passes.length) {
     items.push(item(passes[0].titre, labelPasse(passes[0].date) + (passes[0].comp ? ' · ' + passes[0].comp : '')));
   }
-  futurs.slice(0, 4 - items.length).forEach(c => items.push(item(c.titre, quandLabel(c.date, !!c.allDay))));
+  futurs.slice(0, 4 - items.length).forEach(c => items.push(
+    item(c.titre, quandLabel(c.date, !!c.allDay) + (c.francais ? ' · ' + c.francais : ''))));
   if (!items.length) {
-    // repli : petit fichier édité à la main
+    // repli : les entrées sans date d'events.json
     try {
       const man = JSON.parse(fs.readFileSync(path.join(__dirname, 'events.json'), 'utf8'));
-      man.slice(0, 2).forEach(e => items.push(item(e.titre, e.sous)));
+      man.filter(e => e && !e.date).slice(0, 2).forEach(e => items.push(item(e.titre, e.sous)));
     } catch (e) { /* rien */ }
   }
   donnees.sport.html = items.join('\n') || item('pas de match prévu', 'trêve');
@@ -519,7 +539,7 @@ async function majSport() {
     const heure = c.allDay ? '' : parseInt(p.hour, 10) + ' h' + (p.minute !== '00' ? ' ' + p.minute : '');
     return '<div class="match"><div class="cal"><div class="j">' + esc(jour) + '</div><div class="h">' + esc(heure || '—') + '</div></div>' +
       '<div class="aff"><span class="pastille ' + (c.disc || '') + '"></span>' + esc(c.titre) + '</div>' +
-      '<div class="comp">' + esc(c.comp || '') + '</div></div>';
+      '<div class="comp">' + esc((c.comp || '') + (c.francais ? ' · ' + c.francais : '')) + '</div></div>';
   };
   const sem = futurs.filter(c => c.date.getTime() <= limite);
   const apres = futurs.filter(c => c.date.getTime() > limite);
