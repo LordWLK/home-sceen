@@ -85,13 +85,15 @@
   /* ---------- menu météo (toucher la zone météo de l'accueil) ---------- */
   #vue-meteo-menu { background:#f6f1e8; }
   #vue-meteo-menu .titre-ecran { color:#4a463c; }
-  #vue-meteo-menu .choix { position:absolute; left:0; right:0; top:210px; text-align:center; }
+  #vue-meteo-menu .choix { position:absolute; left:0; right:0; top:190px; bottom:0; }
   #vue-meteo-menu .carte {
-    display:inline-block; width:320px; height:300px; margin:0 22px; padding-top:112px;
-    border-radius:160px 160px 26px 26px; vertical-align:top;
+    position:absolute; top:0; bottom:0; width:350px; padding-top:170px;
+    border-radius:175px 175px 0 0; text-align:center;
   }
-  #vue-meteo-menu .carte .ct { font-family:Georgia,serif; font-style:italic; font-size:30px; }
-  #vue-meteo-menu .carte .cs { font-size:11.5px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; margin-top:12px; opacity:.8; }
+  #vue-meteo-menu .carte.prev { left:50%; margin-left:-378px; }
+  #vue-meteo-menu .carte.chauf { left:50%; margin-left:28px; }
+  #vue-meteo-menu .carte .ct { font-family:Georgia,serif; font-style:italic; font-size:32px; }
+  #vue-meteo-menu .carte .cs { font-size:12px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; margin-top:14px; opacity:.8; }
   #vue-meteo-menu .carte.prev { background:#75815f; color:#f4f0e4; }
   #vue-meteo-menu .carte.chauf { background:#b96f45; color:#f6f1e8; opacity:.55; }
   .nuit #vue-meteo-menu { background:#2e2d28; }
