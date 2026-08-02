@@ -82,6 +82,48 @@
   .m-coeur .date .fete { color:#b0513a; }
   .nuit .date .fete { color:#c98b60; }
 
+  /* ---------- menu météo (toucher la zone météo de l'accueil) ---------- */
+  #vue-meteo-menu { background:#f6f1e8; }
+  #vue-meteo-menu .titre-ecran { color:#4a463c; }
+  #vue-meteo-menu .choix { position:absolute; left:0; right:0; top:210px; text-align:center; }
+  #vue-meteo-menu .carte {
+    display:inline-block; width:320px; height:300px; margin:0 22px; padding-top:112px;
+    border-radius:160px 160px 26px 26px; vertical-align:top;
+  }
+  #vue-meteo-menu .carte .ct { font-family:Georgia,serif; font-style:italic; font-size:30px; }
+  #vue-meteo-menu .carte .cs { font-size:11.5px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; margin-top:12px; opacity:.8; }
+  #vue-meteo-menu .carte.prev { background:#75815f; color:#f4f0e4; }
+  #vue-meteo-menu .carte.chauf { background:#b96f45; color:#f6f1e8; opacity:.55; }
+  .nuit #vue-meteo-menu { background:#2e2d28; }
+  .nuit #vue-meteo-menu .carte.prev { background:#525c43; color:#ddd8c9; }
+  .nuit #vue-meteo-menu .carte.chauf { background:#96593a; color:#e8ddd1; }
+
+  /* ---------- écran prévisions (7 jours) ---------- */
+  #vue-previsions { background:#f6f1e8; }
+  #vue-previsions .titre-ecran { color:#4a463c; }
+  #vue-previsions .cols { position:absolute; left:44px; right:44px; top:170px; bottom:150px; display:-webkit-flex; display:flex; }
+  #vue-previsions .pj { -webkit-flex:1; flex:1; margin:0 7px; background:#efe8d8; border-radius:18px; text-align:center; padding:26px 6px 0; }
+  #vue-previsions .pj.today { background:#e6e9d8; }
+  #vue-previsions .pjh { font-size:11.5px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:#8a7d66; }
+  #vue-previsions .pjl { font-family:Georgia,serif; font-style:italic; font-size:14.5px; color:#6a6455; margin-top:14px; min-height:38px; line-height:1.25; }
+  #vue-previsions .pjt { font-family:"Optima","Avenir Next",sans-serif; font-size:44px; font-weight:500; color:#33322b; margin-top:6px; }
+  #vue-previsions .pjm { font-size:15px; font-weight:600; color:#a2947c; margin-top:2px; }
+  #vue-previsions .pjp { font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#b96f45; margin-top:14px; }
+  .nuit #vue-previsions { background:#2e2d28; }
+  .nuit #vue-previsions .pj { background:#38362f; }
+  .nuit #vue-previsions .pj.today { background:#3f4234; }
+  .nuit #vue-previsions .pjt { color:#e8e2d3; }
+  .nuit #vue-previsions .pjl { color:#b3ad9c; }
+  .nuit #vue-previsions .pjp { color:#c98b60; }
+
+  /* ---------- écran chauffage (réservé, rien branché encore) ---------- */
+  #vue-chauffage { background:#f6f1e8; }
+  #vue-chauffage .titre-ecran { color:#8a4a28; }
+  #vue-chauffage .bientot { position:absolute; left:0; right:0; top:300px; text-align:center; font-family:Georgia,serif; font-style:italic; font-size:52px; color:#b96f45; }
+  #vue-chauffage .explic { position:absolute; left:0; right:0; top:388px; text-align:center; font-size:13px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#a2947c; }
+  .nuit #vue-chauffage { background:#2e2d28; }
+  .nuit #vue-chauffage .bientot { color:#c98b60; }
+
   /* ---------- minuteur de cuisine (double-toucher l'horloge) ---------- */
   #vue-minuteur { background:#f6f1e8; }
   #vue-minuteur .titre-ecran { color:#4a463c; }
@@ -554,7 +596,7 @@
     <div class="head">la maison · lille</div>
     <div class="sante" id="sante"></div>
 
-    <div class="meteo" id="meteo">{{METEO}}</div>
+    <div class="meteo" id="meteo" onclick="return ouvrirMeteoMenu()">{{METEO}}</div>
 
     <div class="pendentif {{PEND_CLASS}}" id="z-pend">{{STUDIO_ITEMS}}</div>
 
@@ -596,6 +638,34 @@
     </div>
 
   </div><!-- /vue-principal -->
+
+  <div class="vue" id="vue-meteo-menu" style="display:none">
+    <div class="retour" onclick="montrer('vue-principal')">accueil</div>
+    <div class="titre-ecran">météo &amp; maison</div>
+    <div class="choix">
+      <div class="carte prev" onclick="return ouvrirPrevisions()">
+        <div class="ct">les jours à venir</div>
+        <div class="cs">prévisions sur 7 jours</div>
+      </div>
+      <div class="carte chauf" onclick="return ouvrirChauffage()">
+        <div class="ct">chauffage</div>
+        <div class="cs">bientôt</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="vue" id="vue-previsions" style="display:none">
+    <div class="retour" onclick="montrer('vue-principal')">accueil</div>
+    <div class="titre-ecran">météo</div>
+    <div class="cols" id="pv-cols"></div>
+  </div>
+
+  <div class="vue" id="vue-chauffage" style="display:none">
+    <div class="retour" onclick="montrer('vue-principal')">accueil</div>
+    <div class="titre-ecran">chauffage</div>
+    <div class="bientot">bientôt</div>
+    <div class="explic">la chaudière et les thermostats se brancheront ici</div>
+  </div>
 
   <div class="vue" id="vue-minuteur" style="display:none">
     <div class="retour" onclick="return quitterMinuteur()">accueil</div>
@@ -809,6 +879,7 @@
             if (typeof d.sportDetail === 'string') { spDetail = d.sportDetail; if (vueActive === 'vue-sport') document.getElementById('sp-liste').innerHTML = spDetail; }
             if (d.cinemaJours) { ciJours = d.cinemaJours; ciLabels = d.cinemaLabels || []; if (vueActive === 'vue-cine') ciRender(); }
             if (d.soleil && d.soleil.coucher) { soleil = d.soleil; }
+            if (typeof d.meteoPrevisions === 'string') { mtPrev = d.meteoPrevisions; if (vueActive === 'vue-previsions') document.getElementById('pv-cols').innerHTML = mtPrev; }
             momentTexte = String((d.moment && d.moment.texte) || '').replace(/</g, '&lt;');
             momentCls = (d.moment && d.moment.cls) || '';
             tick();
@@ -880,6 +951,16 @@
     document.getElementById('sp-liste').innerHTML = spDetail || '<div class="sect">chargement</div>';
     return false;
   }
+
+  // ---- menu météo : prévisions 7 jours + chauffage (réservé) ----
+  var mtPrev = '';
+  function ouvrirMeteoMenu() { montrer('vue-meteo-menu'); return false; }
+  function ouvrirPrevisions() {
+    montrer('vue-previsions');
+    document.getElementById('pv-cols').innerHTML = mtPrev || '';
+    return false;
+  }
+  function ouvrirChauffage() { montrer('vue-chauffage'); return false; }
 
   // ---- minuteur de cuisine : double-toucher l'horloge de l'accueil ----
   // mnFin = échéance (ms) quand il tourne ; mnReste = ms restants quand il est en pause

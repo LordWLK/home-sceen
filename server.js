@@ -15,7 +15,7 @@ const TZ = 'Europe/Paris';
 
 /* ---------- état en mémoire ---------- */
 const donnees = {
-  meteo: { html: 'météo indisponible', soleil: null },
+  meteo: { html: 'météo indisponible', soleil: null, previsions: '' },
   agenda: {
     auj: '<div class="it">chargement</div>',
     venir: '<div class="it">chargement</div>',
@@ -152,9 +152,9 @@ async function majMeteo() {
   const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + CFG.meteo.lat +
     '&longitude=' + CFG.meteo.lon +
     '&current=temperature_2m,weather_code' +
-    '&daily=temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset' +
+    '&daily=temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset,precipitation_probability_max' +
     '&hourly=precipitation_probability,temperature_2m' +
-    '&forecast_days=2&timezone=' + encodeURIComponent(TZ);
+    '&forecast_days=7&timezone=' + encodeURIComponent(TZ);
   const r = await fetch(u);
   const j = await r.json();
   const t = Math.round(j.current.temperature_2m);
@@ -214,6 +214,26 @@ async function majMeteo() {
   donnees.meteo.html = esc(libelleMeteo(j.current.weather_code)) + ' · <b>' + t + '°</b>' +
     '<span class="mdetail">' + tmin + '° / ' + tmax + '°</span>' +
     '<span class="mconseil">' + esc(conseil) + '</span>';
+
+  // ---- écran prévisions : 7 colonnes pré-rendues (une par jour) ----
+  const JSEM = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'];
+  const base = Date.UTC(+n.year, +n.month - 1, +n.day, 12);
+  const nbJours = Math.min(7, (j.daily.time || j.daily.temperature_2m_max || []).length);
+  const cols = [];
+  for (let k = 0; k < nbJours; k++) {
+    const d = new Date(base + k * 86400000);
+    const pk = parisParts(d);
+    const etiq = k === 0 ? "aujourd'hui" : k === 1 ? 'demain' : JSEM[d.getUTCDay()] + ' ' + parseInt(pk.day, 10);
+    const pp = (j.daily.precipitation_probability_max || [])[k];
+    cols.push('<div class="pj' + (k === 0 ? ' today' : '') + '">' +
+      '<div class="pjh">' + esc(etiq) + '</div>' +
+      '<div class="pjl">' + esc(libelleMeteo(j.daily.weather_code[k])) + '</div>' +
+      '<div class="pjt">' + Math.round(j.daily.temperature_2m_max[k]) + '°</div>' +
+      '<div class="pjm">' + Math.round(j.daily.temperature_2m_min[k]) + '°</div>' +
+      (pp >= 30 ? '<div class="pjp">pluie ' + Math.round(pp) + ' %</div>' : '<div class="pjp vide">&nbsp;</div>') +
+      '</div>');
+  }
+  donnees.meteo.previsions = cols.join('');
   sante.meteo = Date.now();
 }
 
@@ -1049,6 +1069,7 @@ const serveur = http.createServer(async (req, res) => {
         cinemaJours: donnees.cinema.detailJours,
         cinemaLabels: donnees.cinema.joursLabel,
         soleil: donnees.meteo.soleil,
+        meteoPrevisions: donnees.meteo.previsions,
         moment: momentDuJour(),
         figees: sourcesFigees(),
       });
