@@ -103,20 +103,64 @@
   /* ---------- écran prévisions (7 jours) ---------- */
   #vue-previsions { background:#f6f1e8; }
   #vue-previsions .titre-ecran { color:#4a463c; }
-  #vue-previsions .cols { position:absolute; left:44px; right:44px; top:170px; bottom:150px; display:-webkit-flex; display:flex; }
-  #vue-previsions .pj { -webkit-flex:1; flex:1; margin:0 7px; background:#efe8d8; border-radius:18px; text-align:center; padding:26px 6px 0; }
+  #vue-previsions .pv-sous { position:absolute; left:0; right:0; top:134px; text-align:center; font-family:Georgia,serif; font-style:italic; font-size:16px; color:#a2947c; }
+  #vue-previsions .cols { position:absolute; left:44px; right:44px; top:186px; bottom:56px; display:-webkit-flex; display:flex; }
+  #vue-previsions .pj { -webkit-flex:1; flex:1; margin:0 7px; background:#efe8d8; border-radius:18px; text-align:center; padding:24px 6px 0; }
   #vue-previsions .pj.today { background:#e6e9d8; }
   #vue-previsions .pjh { font-size:11.5px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:#8a7d66; }
-  #vue-previsions .pjl { font-family:Georgia,serif; font-style:italic; font-size:14.5px; color:#6a6455; margin-top:14px; min-height:38px; line-height:1.25; }
-  #vue-previsions .pjt { font-family:"Optima","Avenir Next",sans-serif; font-size:44px; font-weight:500; color:#33322b; margin-top:6px; }
+  #vue-previsions .pjl { font-family:Georgia,serif; font-style:italic; font-size:14.5px; color:#6a6455; margin-top:8px; min-height:38px; line-height:1.25; }
+  #vue-previsions .pjt { font-family:"Optima","Avenir Next",sans-serif; font-size:44px; font-weight:500; color:#33322b; margin-top:2px; }
   #vue-previsions .pjm { font-size:15px; font-weight:600; color:#a2947c; margin-top:2px; }
-  #vue-previsions .pjp { font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#b96f45; margin-top:14px; }
+  #vue-previsions .pjp { font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#b96f45; margin-top:16px; }
+  #vue-previsions .pjv { font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:#b3a78e; margin-top:6px; }
+  #vue-previsions .pjv.fort { color:#b96f45; }
   .nuit #vue-previsions { background:#2e2d28; }
   .nuit #vue-previsions .pj { background:#38362f; }
   .nuit #vue-previsions .pj.today { background:#3f4234; }
   .nuit #vue-previsions .pjt { color:#e8e2d3; }
   .nuit #vue-previsions .pjl { color:#b3ad9c; }
   .nuit #vue-previsions .pjp { color:#c98b60; }
+  .nuit #vue-previsions .pjv { color:#8a8171; }
+  .nuit #vue-previsions .pv-sous { color:#9b917d; }
+
+  /* icônes météo découpées (css pur) : conteneur .pico + i (+ pseudos) */
+  #vue-previsions .pico { position:relative; height:54px; margin-top:14px; }
+  #vue-previsions .pico i { position:absolute; }
+  /* soleil : disque doré et halo */
+  .pico.ico-soleil i { left:50%; top:8px; width:32px; height:32px; margin-left:-16px; border-radius:50%; background:#d9a441; box-shadow:0 0 0 7px rgba(217,164,65,.22); }
+  /* nuage générique : pastille + deux bosses */
+  .pico i.n, .pico.ico-eclaircies i, .pico.ico-couvert i, .pico.ico-pluie i, .pico.ico-orage i, .pico.ico-neige i {
+    left:50%; top:22px; width:40px; height:15px; margin-left:-20px; border-radius:9px;
+  }
+  .pico.ico-eclaircies i:before, .pico.ico-couvert i:before, .pico.ico-pluie i:before, .pico.ico-orage i:before, .pico.ico-neige i:before {
+    content:''; position:absolute; left:5px; top:-10px; width:17px; height:17px; border-radius:50%; background:inherit;
+  }
+  .pico.ico-eclaircies i:after, .pico.ico-couvert i:after, .pico.ico-pluie i:after, .pico.ico-orage i:after, .pico.ico-neige i:after {
+    content:''; position:absolute; right:6px; top:-6px; width:12px; height:12px; border-radius:50%; background:inherit;
+  }
+  /* éclaircies : soleil qui dépasse derrière le nuage clair */
+  .pico.ico-eclaircies:before { content:''; position:absolute; left:50%; top:6px; width:18px; height:18px; margin-left:2px; border-radius:50%; background:#d9a441; }
+  .pico.ico-eclaircies i { background:#fbf7ee; box-shadow:0 1px 0 rgba(53,52,45,.08); }
+  .pico.ico-couvert i { background:#c2baa8; }
+  /* pluie : nuage + trois gouttes penchées (box-shadow) */
+  .pico.ico-pluie i { background:#a9a190; }
+  .pico.ico-pluie:after { content:''; position:absolute; left:50%; top:44px; width:3.5px; height:9px; margin-left:-14px; border-radius:2px; background:#66758a; box-shadow:10px 2px 0 #66758a, 20px 0 0 #66758a; -webkit-transform:rotate(18deg); transform:rotate(18deg); }
+  /* orage : nuage sombre + éclair doré (barre biseautée) */
+  .pico.ico-orage i { background:#6a655a; }
+  .pico.ico-orage:after { content:''; position:absolute; left:50%; top:42px; width:6px; height:15px; margin-left:-3px; background:#d9a441; -webkit-transform:skewX(-22deg); transform:skewX(-22deg); }
+  /* neige : nuage + trois flocons ronds */
+  .pico.ico-neige i { background:#d9d2c1; }
+  .pico.ico-neige:after { content:''; position:absolute; left:50%; top:46px; width:5px; height:5px; margin-left:-14px; border-radius:50%; background:#fff; box-shadow:11px 3px 0 #fff, 22px 0 0 #fff; }
+  /* brouillard : trois barres douces */
+  .pico.ico-brouillard i { left:50%; top:16px; width:38px; height:5px; margin-left:-19px; border-radius:3px; background:#c2baa8; }
+  .pico.ico-brouillard i:before, .pico.ico-brouillard i:after { content:''; position:absolute; left:0; width:38px; height:5px; border-radius:3px; background:inherit; }
+  .pico.ico-brouillard i:before { top:9px; left:-5px; }
+  .pico.ico-brouillard i:after { top:18px; left:4px; }
+  /* variantes nuit : nuages éclaircis pour rester lisibles */
+  .nuit .pico.ico-eclaircies i { background:#d8d2c2; box-shadow:none; }
+  .nuit .pico.ico-couvert i, .nuit .pico.ico-brouillard i { background:#8f887a; }
+  .nuit .pico.ico-pluie i { background:#847d6e; }
+  .nuit .pico.ico-neige i { background:#a9a292; }
 
   /* ---------- écran chauffage (réservé, rien branché encore) ---------- */
   #vue-chauffage { background:#f6f1e8; }
@@ -659,6 +703,7 @@
   <div class="vue" id="vue-previsions" style="display:none">
     <div class="retour" onclick="montrer('vue-principal')">accueil</div>
     <div class="titre-ecran">météo</div>
+    <div class="pv-sous" id="pv-sous"></div>
     <div class="cols" id="pv-cols"></div>
   </div>
 
@@ -880,8 +925,8 @@
             if (d.agendaSemaines) { agSem = d.agendaSemaines; if (vueActive === 'vue-agenda') agRender(); }
             if (typeof d.sportDetail === 'string') { spDetail = d.sportDetail; if (vueActive === 'vue-sport') document.getElementById('sp-liste').innerHTML = spDetail; }
             if (d.cinemaJours) { ciJours = d.cinemaJours; ciLabels = d.cinemaLabels || []; if (vueActive === 'vue-cine') ciRender(); }
-            if (d.soleil && d.soleil.coucher) { soleil = d.soleil; }
-            if (typeof d.meteoPrevisions === 'string') { mtPrev = d.meteoPrevisions; if (vueActive === 'vue-previsions') document.getElementById('pv-cols').innerHTML = mtPrev; }
+            if (d.soleil && d.soleil.coucher) { soleil = d.soleil; soleilReel = true; }
+            if (typeof d.meteoPrevisions === 'string') { mtPrev = d.meteoPrevisions; if (vueActive === 'vue-previsions') { document.getElementById('pv-cols').innerHTML = mtPrev; pvSous(); } }
             momentTexte = String((d.moment && d.moment.texte) || '').replace(/</g, '&lt;');
             momentCls = (d.moment && d.moment.cls) || '';
             tick();
@@ -955,11 +1000,17 @@
   }
 
   // ---- menu météo : prévisions 7 jours + chauffage (réservé) ----
-  var mtPrev = '';
+  var mtPrev = '', soleilReel = false;
+  function heureSoleil(mn) { var h = Math.floor(mn / 60), m = mn % 60; return h + ' h ' + (m < 10 ? '0' : '') + m; }
+  function pvSous() {
+    document.getElementById('pv-sous').innerHTML = soleilReel
+      ? 'lever ' + heureSoleil(soleil.lever) + ' · coucher ' + heureSoleil(soleil.coucher) : '';
+  }
   function ouvrirMeteoMenu() { montrer('vue-meteo-menu'); return false; }
   function ouvrirPrevisions() {
     montrer('vue-previsions');
     document.getElementById('pv-cols').innerHTML = mtPrev || '';
+    pvSous();
     return false;
   }
   function ouvrirChauffage() { montrer('vue-chauffage'); return false; }

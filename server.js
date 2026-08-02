@@ -118,6 +118,17 @@ function libelleMeteo(code) {
   for (const [c, l] of CODES_METEO) { if (code >= c) lbl = l; }
   return lbl;
 }
+// famille d'icône css pour l'écran prévisions (dessinées dans le template)
+function iconeMeteo(code) {
+  if (code <= 1) return 'ico-soleil';
+  if (code === 2) return 'ico-eclaircies';
+  if (code === 3) return 'ico-couvert';
+  if (code === 45 || code === 48) return 'ico-brouillard';
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return 'ico-pluie';
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'ico-neige';
+  if (code >= 95) return 'ico-orage';
+  return 'ico-couvert';
+}
 // conseil météo adaptatif et amical : « info · geste », toujours avec l'heure des choses.
 // fonction pure et déterministe (pas d'aléatoire : la zone ne doit pas clignoter au poll).
 // v = { h, tmax, tmin, ts, rhAuj, tmin2, tmax2, rhDem, lblDem }
@@ -152,7 +163,7 @@ async function majMeteo() {
   const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + CFG.meteo.lat +
     '&longitude=' + CFG.meteo.lon +
     '&current=temperature_2m,weather_code' +
-    '&daily=temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset,precipitation_probability_max' +
+    '&daily=temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset,precipitation_probability_max,wind_speed_10m_max,uv_index_max' +
     '&hourly=precipitation_probability,temperature_2m' +
     '&forecast_days=7&timezone=' + encodeURIComponent(TZ);
   const r = await fetch(u);
@@ -225,12 +236,16 @@ async function majMeteo() {
     const pk = parisParts(d);
     const etiq = k === 0 ? "aujourd'hui" : k === 1 ? 'demain' : JSEM[d.getUTCDay()] + ' ' + parseInt(pk.day, 10);
     const pp = (j.daily.precipitation_probability_max || [])[k];
+    const vent = Math.round((j.daily.wind_speed_10m_max || [])[k] || 0);
+    const uv = Math.round((j.daily.uv_index_max || [])[k] || 0);
     cols.push('<div class="pj' + (k === 0 ? ' today' : '') + '">' +
       '<div class="pjh">' + esc(etiq) + '</div>' +
+      '<div class="pico ' + iconeMeteo(j.daily.weather_code[k]) + '"><i></i></div>' +
       '<div class="pjl">' + esc(libelleMeteo(j.daily.weather_code[k])) + '</div>' +
       '<div class="pjt">' + Math.round(j.daily.temperature_2m_max[k]) + '°</div>' +
       '<div class="pjm">' + Math.round(j.daily.temperature_2m_min[k]) + '°</div>' +
       (pp >= 30 ? '<div class="pjp">pluie ' + Math.round(pp) + ' %</div>' : '<div class="pjp vide">&nbsp;</div>') +
+      '<div class="pjv' + (vent >= 40 ? ' fort' : '') + '">vent ' + vent + (uv >= 6 ? ' · uv ' + uv : '') + '</div>' +
       '</div>');
   }
   donnees.meteo.previsions = cols.join('');
