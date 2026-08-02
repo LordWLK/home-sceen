@@ -451,6 +451,8 @@ async function mmaCandidats() {
         if (isNaN(brut) || brut < new Date(Date.now() - 12 * 3600000) ||
             brut > new Date(Date.now() + 35 * 86400000)) continue;
         const label = String(c.label || '');
+        // l'émission hebdo de recrutement pollue le calendrier ufc ("Season 10, Week N")
+        if (/contender series/i.test(label)) continue;
         const num = label.match(new RegExp('^' + lg.nom + '\\s+(\\d+)', 'i'));
         // tête d'affiche depuis le libellé du calendrier ("Org…: A vs. B")
         const tete = sansAccents(label.split(':')[1] || '').trim().toLowerCase()
