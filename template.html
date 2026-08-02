@@ -413,6 +413,55 @@
   .nuit .arch.olive { background:#525c43; color:#ddd8c9; }
   .nuit .arch.sable { background:#a8977a; color:#2e2d28; }
   .nuit .arch.terra { background:#96593a; color:#e8ddd1; }
+
+  /* ---------- moments de l'année : la palette glisse pour la fête ---------- */
+  /* noël : l'olive devient sapin, le terracotta devient rouge profond */
+  .m-noel #stage { background:#f3f1ea; }
+  .m-noel .arch.olive { background:#55654a; }
+  .m-noel .arch.terra { background:#a03d2e; }
+  .m-noel .pendentif { background:#8f3a2c; }
+  .m-noel .arch.sable .it.next:after { background:#a03d2e; }
+  .m-noel .date .fete { color:#a03d2e; }
+  .nuit.m-noel #stage { background:#2b2c27; }
+  .nuit.m-noel .arch.olive { background:#414d38; }
+  .nuit.m-noel .arch.terra { background:#7e3527; }
+  .nuit.m-noel .pendentif { background:#7e3527; }
+  .nuit.m-noel .date .fete { color:#c96b52; }
+  /* saint-valentin : le terracotta devient framboise, l'ivoire rosit à peine */
+  .m-coeur #stage { background:#f7efec; }
+  .m-coeur .arch.terra { background:#ab4a52; }
+  .m-coeur .pendentif { background:#a34755; }
+  .m-coeur .arch.sable .it.next:after { background:#ab4a52; }
+  .m-coeur .date .fete { color:#a8404d; }
+  .nuit.m-coeur #stage { background:#2e2b2b; }
+  .nuit.m-coeur .arch.terra { background:#8a3d44; }
+  .nuit.m-coeur .pendentif { background:#8a3d44; }
+  .nuit.m-coeur .date .fete { color:#c9737e; }
+  /* grande occasion (anniversaires, nouvel an) : le sable se dore */
+  .m-fete #stage { background:#f7f2e6; }
+  .m-fete .arch.sable { background:#dfc691; }
+  .m-fete .date .fete { color:#9a7b2c; }
+  .nuit.m-fete .arch.sable { background:#b09a5e; }
+  .nuit.m-fete .date .fete { color:#c9a95c; }
+
+  /* petit motif dessiné en css à côté du vœu (aucun émoji) */
+  .date .fete .deco { display:none; }
+  /* sapin (deux triangles empilés) */
+  .m-noel .date .fete .deco { display:inline-block; position:relative; width:16px; height:15px; margin-right:8px; vertical-align:-2px; }
+  .m-noel .date .fete .deco:before { content:''; position:absolute; left:3px; top:0; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:7px solid #55654a; }
+  .m-noel .date .fete .deco:after { content:''; position:absolute; left:1px; top:5px; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:9px solid #55654a; }
+  .nuit.m-noel .date .fete .deco:before, .nuit.m-noel .date .fete .deco:after { border-bottom-color:#7f8f6d; }
+  /* cœur (carré tourné + deux cercles) */
+  .m-coeur .date .fete .deco { display:inline-block; position:relative; width:9px; height:9px; margin:0 12px 0 3px; vertical-align:-1px; background:#a8404d; -webkit-transform:rotate(45deg); transform:rotate(45deg); }
+  .m-coeur .date .fete .deco:before, .m-coeur .date .fete .deco:after { content:''; position:absolute; width:9px; height:9px; border-radius:50%; background:#a8404d; }
+  .m-coeur .date .fete .deco:before { left:-5px; top:0; }
+  .m-coeur .date .fete .deco:after { left:0; top:-5px; }
+  .nuit.m-coeur .date .fete .deco, .nuit.m-coeur .date .fete .deco:before, .nuit.m-coeur .date .fete .deco:after { background:#c9737e; }
+  /* bougie (mèche dorée, flamme terracotta) */
+  .m-fete .date .fete .deco { display:inline-block; position:relative; width:5px; height:12px; margin:0 9px 0 1px; vertical-align:-1px; background:#9a7b2c; border-radius:1.5px; }
+  .m-fete .date .fete .deco:before { content:''; position:absolute; left:0; top:-8px; width:5px; height:7px; border-radius:50% 50% 50% 50% / 62% 62% 38% 38%; background:#b96f45; }
+  .nuit.m-fete .date .fete .deco { background:#c9a95c; }
+  .nuit.m-fete .date .fete .deco:before { background:#c98b60; }
   .nuit .music { background:#26251f; border:1px solid #46443a; color:#d8d2c4; }
   .nuit .vinyl { background:#1c1b17; }
   .nuit .vinyl:after { background:#c98b60; }
@@ -563,7 +612,7 @@
     document.getElementById('clock').innerHTML = pad(d.getHours()) + ':' + pad(d.getMinutes());
     document.getElementById('date').innerHTML =
       JOURS[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()] +
-      (momentTexte ? '<span class="fete">' + momentTexte + '</span>' : '');
+      (momentTexte ? '<span class="fete"><span class="deco"></span>' + momentTexte + '</span>' : '');
     var mn = d.getHours() * 60 + d.getMinutes();
     var nuit = (mn >= soleil.coucher || mn < soleil.lever);
     document.body.className = (nuit ? 'nuit' : '') + (momentCls ? ' ' + momentCls : '');
