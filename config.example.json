@@ -33,6 +33,11 @@
   "abonnesManuel": 0,
   "statsUrl": "",
 
+  "alerteUrl": "",
+  "moments": [
+    { "jour": "05-14", "texte": "joyeux anniversaire" }
+  ],
+
   "cinemas": [
     { "allocine": "P0086", "nom": "ugc lille" },
     { "allocine": "P0047", "nom": "majestic" },

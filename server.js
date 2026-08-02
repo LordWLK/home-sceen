@@ -218,6 +218,49 @@ async function majMeteo() {
 }
 
 /* ============================================================
+   moments de l'année · petit clin d'œil sur la ligne de date
+   (noël, nouvel an, saint-valentin + dates de config.moments)
+   ============================================================ */
+function momentDuJour() {
+  const p = parisParts(new Date());
+  const md = p.month + '-' + p.day; // "12-24"
+  if (md >= '12-20' && md <= '12-23') return { cls: 'm-noel', texte: "c'est bientôt noël" };
+  if (md >= '12-24' && md <= '12-26') return { cls: 'm-noel', texte: 'joyeux noël' };
+  if (md === '12-31') return { cls: 'm-fete', texte: 'bonne saint-sylvestre' };
+  if (md === '01-01') return { cls: 'm-fete', texte: 'bonne année' };
+  if (md === '02-14') return { cls: 'm-coeur', texte: 'joyeuse saint-valentin' };
+  const perso = (CFG.moments || []).find(m => m && m.jour === md && m.texte);
+  if (perso) return { cls: 'm-fete', texte: String(perso.texte).toLowerCase() };
+  return null;
+}
+
+/* ============================================================
+   watchdog · l'ipad interroge le serveur en continu ; s'il se tait
+   trop longtemps (safari planté, ipad déchargé), on prévient via
+   config.alerteUrl (webhook texte type ntfy.sh), une seule fois
+   ============================================================ */
+let dernierPoll = Date.now();
+let ecranMuet = false;
+const SEUIL_ECRAN = 30 * 60 * 1000;
+async function alerte(texte) {
+  console.log('[watchdog]', texte);
+  if (!CFG.alerteUrl) return;
+  try {
+    await fetch(CFG.alerteUrl, { method: 'POST', headers: { Title: 'ecran maison' }, body: texte });
+  } catch (e) { console.log('[watchdog] alerte impossible :', e.message); }
+}
+function verifieEcran() {
+  const silence = Date.now() - dernierPoll;
+  if (!ecranMuet && silence > SEUIL_ECRAN) {
+    ecranMuet = true;
+    alerte("l'écran ne répond plus depuis " + Math.round(silence / 60000) + ' min (safari planté ou ipad déchargé ?)');
+  } else if (ecranMuet && silence < 2 * 60 * 1000) {
+    ecranMuet = false;
+    alerte("l'écran est de retour");
+  }
+}
+
+/* ============================================================
    agenda · calendrier icloud publié (url ics), récurrences incluses
    ============================================================ */
 // épingles : événements perso choisis à la main (tap dans la vue semaine) pour
@@ -985,9 +1028,11 @@ const serveur = http.createServer(async (req, res) => {
       res.end(page());
 
     } else if (route === '/musique/etat') {
+      dernierPoll = Date.now(); // l'ipad interroge toutes les 2 s : signe de vie
       json(res, { playing: musique.playing, title: musique.title, artist: musique.artist });
 
     } else if (route === '/contenu') {
+      dernierPoll = Date.now();
       // toutes les zones de la page, pour rafraîchir sans recharger
       json(res, {
         meteo: donnees.meteo.html,
@@ -1003,6 +1048,7 @@ const serveur = http.createServer(async (req, res) => {
         cinemaJours: donnees.cinema.detailJours,
         cinemaLabels: donnees.cinema.joursLabel,
         soleil: donnees.meteo.soleil,
+        moment: momentDuJour(),
         figees: sourcesFigees(),
       });
 
@@ -1086,6 +1132,7 @@ setInterval(rafraichirTout, 2 * 60 * 1000);   // données : toutes les 2 min
 // forcées de 90 min et plus (vécu), la capsule devient moins réactive, pas plus
 setInterval(majMusique, 5 * 1000);
 setInterval(rafraichirLent, 6 * 3600 * 1000); // ciné + stats : toutes les 6 h
+setInterval(verifieEcran, 5 * 60 * 1000);     // watchdog : l'ipad donne-t-il signe de vie ?
 
 serveur.listen(CFG.port, () => {
   console.log('écran maison prêt : http://<ip-du-vps>:' + CFG.port + CFG.basePath + '/');

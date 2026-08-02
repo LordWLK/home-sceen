@@ -77,13 +77,47 @@
     font-family:Georgia, serif; font-style:italic;
     font-size:27px; color:#7c7361;
   }
+  /* moment de l'année : clin d'œil sous la date (noël, 14 février…) */
+  .date .fete { display:block; font-size:16.5px; line-height:1.1; margin-top:4px; color:#b96f45; }
+  .m-coeur .date .fete { color:#b0513a; }
+  .nuit .date .fete { color:#c98b60; }
+
+  /* ---------- minuteur de cuisine (double-toucher l'horloge) ---------- */
+  #vue-minuteur { background:#f6f1e8; }
+  #vue-minuteur .titre-ecran { color:#4a463c; }
+  #vue-minuteur .compte {
+    position:absolute; left:0; right:0; top:216px; text-align:center;
+    font-family:"Optima", "Avenir Next", sans-serif;
+    font-size:220px; font-weight:500; line-height:1; color:#33322b; letter-spacing:.02em;
+  }
+  #vue-minuteur .presets { position:absolute; left:0; right:0; top:492px; text-align:center; }
+  #vue-minuteur .presets span {
+    display:inline-block; font-family:Georgia,serif; font-style:italic; font-size:21px;
+    color:#75815f; border:1.5px solid #c3c9ae; border-radius:22px; padding:10px 26px; margin:0 7px;
+  }
+  #vue-minuteur .actions { position:absolute; left:0; right:0; top:588px; text-align:center; }
+  #vue-minuteur .actions span {
+    display:inline-block; font-size:13px; font-weight:700; letter-spacing:.2em; text-transform:uppercase;
+    color:#8a7d66; padding:12px 26px; margin:0 10px;
+  }
+  #vue-minuteur .actions span.pr { color:#fff; background:#b96f45; border-radius:22px; }
+  #vue-minuteur.fini .compte { color:#b96f45; }
+  @-webkit-keyframes pulse-fini { 0% { background:#f6f1e8; } 50% { background:#eeD9c8; } 100% { background:#f6f1e8; } }
+  @keyframes pulse-fini { 0% { background:#f6f1e8; } 50% { background:#eed9c8; } 100% { background:#f6f1e8; } }
+  #vue-minuteur.fini { -webkit-animation:pulse-fini 1.2s infinite; animation:pulse-fini 1.2s infinite; }
+  .nuit #vue-minuteur { background:#2e2d28; }
+  .nuit #vue-minuteur .compte { color:#e8e2d3; }
+  .nuit #vue-minuteur .presets span { color:#a8b18d; border-color:#565143; }
+  @-webkit-keyframes pulse-fini-nuit { 0% { background:#2e2d28; } 50% { background:#4a3a2c; } 100% { background:#2e2d28; } }
+  @keyframes pulse-fini-nuit { 0% { background:#2e2d28; } 50% { background:#4a3a2c; } 100% { background:#2e2d28; } }
+  .nuit #vue-minuteur.fini { -webkit-animation:pulse-fini-nuit 1.2s infinite; animation:pulse-fini-nuit 1.2s infinite; }
 
   /* ---------- système de vues (principal + écrans de détail) ---------- */
   .vue { position:absolute; left:0; top:0; width:1024px; height:768px; }
 
   /* ménage compact sur l'écran principal (tactile → détail) */
   .menage {
-    position:absolute; left:64px; top:274px; height:34px; max-width:430px;
+    position:absolute; left:64px; top:280px; height:34px; max-width:430px;
     display:-webkit-flex; display:flex; -webkit-align-items:center; align-items:center;
     background:#efe7d6; border-radius:18px; padding:0 18px;
   }
@@ -436,6 +470,25 @@
 
   </div><!-- /vue-principal -->
 
+  <div class="vue" id="vue-minuteur" style="display:none">
+    <div class="retour" onclick="return quitterMinuteur()">accueil</div>
+    <div class="titre-ecran">minuteur</div>
+    <div class="compte" id="mn-compte">0:00</div>
+    <div class="presets">
+      <span onclick="return mnPreset(1)">1 min</span>
+      <span onclick="return mnPreset(5)">5 min</span>
+      <span onclick="return mnPreset(10)">10 min</span>
+      <span onclick="return mnPreset(15)">15 min</span>
+      <span onclick="return mnPreset(20)">20 min</span>
+      <span onclick="return mnPreset(30)">30 min</span>
+    </div>
+    <div class="actions">
+      <span onclick="return mnPlus()">+ 1 min</span>
+      <span class="pr" id="mn-pause" onclick="return mnPause()">pause</span>
+      <span onclick="return mnStop()">annuler</span>
+    </div>
+  </div>
+
   <div class="vue" id="vue-menage" style="display:none">
     <div class="retour" onclick="montrer('vue-principal')">accueil</div>
     <div class="titre-ecran">ménage</div>
@@ -476,12 +529,16 @@
      (la page est servie sous le chemin secret, avec barre oblique finale) */
 
   // mise à l'échelle : 1:1 sur l'ipad, réduit proprement ailleurs
+  // anti-marquage lcd : tout l'écran glisse d'un pixel selon un petit cycle,
+  // imperceptible mais suffisant pour ne pas figer la même image des heures
+  var decCycle = [[0, 0], [1, 0], [1, 1], [0, 1]], decIdx = 0;
   function fit() {
     var s = Math.min(window.innerWidth / 1024, window.innerHeight / 768);
     if (s > 1) { s = 1; }
+    var d = decCycle[decIdx];
     var st = document.getElementById('stage');
-    st.style.webkitTransform = 'scale(' + s + ')';
-    st.style.transform = 'scale(' + s + ')';
+    st.style.webkitTransform = 'scale(' + s + ') translate(' + d[0] + 'px,' + d[1] + 'px)';
+    st.style.transform = 'scale(' + s + ') translate(' + d[0] + 'px,' + d[1] + 'px)';
     var f = document.getElementById('fit');
     f.style.width = (1024 * s) + 'px';
     f.style.height = (768 * s) + 'px';
@@ -490,6 +547,7 @@
   }
   window.addEventListener('resize', fit);
   fit();
+  setInterval(function () { decIdx = (decIdx + 1) % decCycle.length; fit(); }, 4 * 60 * 1000);
 
   // horloge, date, bascule jour / nuit
   var JOURS = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
@@ -498,14 +556,17 @@
   // mode nuit calé sur le soleil : bornes en minutes depuis minuit, envoyées par
   // le serveur (open-meteo) ; repli 21 h → 7 h tant que la première synchro n'est pas là
   var soleil = { lever: 7 * 60, coucher: 21 * 60 };
+  // moment de l'année (noël, 14 février…) : texte sur la ligne de date + classe sur body
+  var momentTexte = '', momentCls = '';
   function tick() {
     var d = new Date();
     document.getElementById('clock').innerHTML = pad(d.getHours()) + ':' + pad(d.getMinutes());
     document.getElementById('date').innerHTML =
-      JOURS[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()];
+      JOURS[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()] +
+      (momentTexte ? '<span class="fete">' + momentTexte + '</span>' : '');
     var mn = d.getHours() * 60 + d.getMinutes();
     var nuit = (mn >= soleil.coucher || mn < soleil.lever);
-    document.body.className = nuit ? 'nuit' : '';
+    document.body.className = (nuit ? 'nuit' : '') + (momentCls ? ' ' + momentCls : '');
   }
   tick();
   setInterval(tick, 1000);
@@ -620,7 +681,10 @@
             if (d.agendaSemaines) { agSem = d.agendaSemaines; if (vueActive === 'vue-agenda') agRender(); }
             if (typeof d.sportDetail === 'string') { spDetail = d.sportDetail; if (vueActive === 'vue-sport') document.getElementById('sp-liste').innerHTML = spDetail; }
             if (d.cinemaJours) { ciJours = d.cinemaJours; ciLabels = d.cinemaLabels || []; if (vueActive === 'vue-cine') ciRender(); }
-            if (d.soleil && d.soleil.coucher) { soleil = d.soleil; tick(); }
+            if (d.soleil && d.soleil.coucher) { soleil = d.soleil; }
+            momentTexte = String((d.moment && d.moment.texte) || '').replace(/</g, '&lt;');
+            momentCls = (d.moment && d.moment.cls) || '';
+            tick();
             majSante(d.figees);
             premierContenu = false;
           } catch (e) {}
@@ -647,8 +711,12 @@
   function planifierRetour() {
     if (retourTimer) { clearTimeout(retourTimer); retourTimer = null; }
     // hors écran principal : retour auto après 5 min sans interaction
+    // (sauf minuteur en marche : on ne coupe pas une cuisson)
     if (vueActive !== 'vue-principal') {
-      retourTimer = setTimeout(function () { montrer('vue-principal'); }, 300000);
+      retourTimer = setTimeout(function () {
+        if (vueActive === 'vue-minuteur' && mnActif()) { planifierRetour(); }
+        else { montrer('vue-principal'); }
+      }, 300000);
     }
   }
   function reArmer() { if (vueActive !== 'vue-principal') planifierRetour(); }
@@ -685,6 +753,81 @@
     document.getElementById('sp-liste').innerHTML = spDetail || '<div class="sect">chargement</div>';
     return false;
   }
+
+  // ---- minuteur de cuisine : double-toucher l'horloge de l'accueil ----
+  // mnFin = échéance (ms) quand il tourne ; mnReste = ms restants quand il est en pause
+  var mnFin = 0, mnReste = 0, mnTimer = null, mnSonne = false;
+  function mnActif() { return mnFin > 0 || mnReste > 0; }
+  function mnAffiche(ms) {
+    if (ms < 0) ms = 0;
+    var s = Math.round(ms / 1000);
+    var v = document.getElementById('vue-minuteur');
+    document.getElementById('mn-compte').innerHTML =
+      Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
+    if (mnSonne && v.className.indexOf('fini') === -1) v.className += ' fini';
+    if (!mnSonne) v.className = v.className.replace(/ ?fini/, '');
+  }
+  function mnTic() {
+    if (!mnFin) return;
+    var reste = mnFin - (new Date()).getTime();
+    if (reste <= 0 && !mnSonne) { mnSonne = true; }
+    mnAffiche(reste);
+  }
+  function mnLance() {
+    if (mnTimer) clearInterval(mnTimer);
+    mnTimer = setInterval(mnTic, 500);
+    document.getElementById('mn-pause').innerHTML = 'pause';
+    mnTic();
+  }
+  function mnPreset(min) { mnSonne = false; mnReste = 0; mnFin = (new Date()).getTime() + min * 60000; mnLance(); return false; }
+  function mnPlus() {
+    if (mnSonne) return false;
+    if (mnFin) mnFin += 60000;
+    else if (mnReste) mnReste += 60000;
+    mnAffiche(mnFin ? mnFin - (new Date()).getTime() : mnReste);
+    return false;
+  }
+  function mnPause() {
+    if (mnSonne) return mnStop();
+    if (mnFin) { // en marche → pause
+      mnReste = Math.max(0, mnFin - (new Date()).getTime());
+      mnFin = 0;
+      document.getElementById('mn-pause').innerHTML = 'reprendre';
+    } else if (mnReste) { // en pause → reprise
+      mnFin = (new Date()).getTime() + mnReste;
+      mnReste = 0;
+      mnLance();
+    }
+    return false;
+  }
+  function mnStop() {
+    mnFin = 0; mnReste = 0; mnSonne = false;
+    if (mnTimer) { clearInterval(mnTimer); mnTimer = null; }
+    mnAffiche(0);
+    montrer('vue-principal');
+    return false;
+  }
+  function quitterMinuteur() {
+    // le bouton accueil laisse le minuteur tourner en arrière-plan ;
+    // il rouvrira l'écran tout seul quand ça sonne
+    montrer('vue-principal');
+    return false;
+  }
+  // ça sonne pendant qu'on est ailleurs → on remontre le minuteur
+  setInterval(function () { if (mnSonne && vueActive !== 'vue-minuteur') { montrer('vue-minuteur'); } }, 1500);
+  function ouvrirMinuteur() {
+    montrer('vue-minuteur');
+    mnAffiche(mnFin ? mnFin - (new Date()).getTime() : mnReste);
+    return false;
+  }
+  // double-toucher l'horloge (moins de 500 ms entre deux touchers)
+  var mnDernierTap = 0;
+  document.getElementById('clock').onclick = function () {
+    var t = (new Date()).getTime();
+    if (t - mnDernierTap < 500) { ouvrirMinuteur(); }
+    mnDernierTap = t;
+    return false;
+  };
 
   // ---- écran ciné : 4 colonnes par jour (aujourd'hui / demain / surlendemain) ----
   var ciJours = [], ciLabels = [], ciDay = 0;
