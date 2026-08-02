@@ -444,50 +444,68 @@
   .nuit.m-fete .arch.sable { background:#b09a5e; }
   .nuit.m-fete .date .fete { color:#c9a95c; }
 
-  /* ---------- ornements suspendus des jours de fête (css pur) ---------- */
-  /* des fils tombent du bord haut, dans les deux respirations qui encadrent
-     le pendentif ; chaque thème y accroche son ornement, avec un léger balancement */
+  /* ---------- décors des jours de fête (css pur, une structure par thème) ---------- */
+  /* noël : guirlande de boules suspendues · valentin : couple de cœurs entrelacés
+     · grande occasion : ballons qui flottent. tout est masqué hors fête */
   .deco-fete { display:none; position:absolute; left:0; top:0; width:1024px; height:210px; pointer-events:none; }
   .m-noel .deco-fete, .m-coeur .deco-fete, .m-fete .deco-fete { display:block; }
-  .deco-fete .fil { position:absolute; top:0; width:2px; background:rgba(53,52,45,.20); -webkit-transform-origin:top center; transform-origin:top center; }
+  .deco-fete .fil, .deco-fete .ballon { display:none; position:absolute; }
+  .deco-fete .fil { top:0; width:2px; background:rgba(53,52,45,.20); -webkit-transform-origin:top center; transform-origin:top center; }
   .nuit .deco-fete .fil { background:rgba(232,226,211,.16); }
-  .deco-fete .f1 { left:338px; height:56px; }
-  .deco-fete .f2 { left:374px; height:94px; }
-  .deco-fete .f3 { left:656px; height:102px; }
-  .deco-fete .f4 { left:704px; height:60px; }
-  .deco-fete .f5 { left:756px; height:126px; }
   @-webkit-keyframes balance { 0% { -webkit-transform:rotate(2.2deg); } 100% { -webkit-transform:rotate(-2.2deg); } }
   @keyframes balance { 0% { transform:rotate(2.2deg); } 100% { transform:rotate(-2.2deg); } }
   .deco-fete .fil { -webkit-animation:balance 3.8s ease-in-out infinite alternate; animation:balance 3.8s ease-in-out infinite alternate; }
-  .deco-fete .f2 { -webkit-animation-duration:4.6s; animation-duration:4.6s; }
-  .deco-fete .f3 { -webkit-animation-duration:5.2s; animation-duration:5.2s; }
-  .deco-fete .f4 { -webkit-animation-duration:4.1s; animation-duration:4.1s; }
-  .deco-fete .f5 { -webkit-animation-duration:4.9s; animation-duration:4.9s; }
   .deco-fete .orn { position:absolute; left:50%; }
-  /* noël : boules (attache dorée, ombre douce) */
-  .m-noel .orn { bottom:-20px; width:20px; height:20px; margin-left:-10px; border-radius:50%; box-shadow:inset -3px -4px 0 rgba(0,0,0,.10); }
-  .m-noel .orn:before { content:''; position:absolute; left:50%; top:-4px; width:6px; height:4px; margin-left:-3px; border-radius:1.5px; background:#c9a95c; }
-  .m-noel .f1 .orn { background:#a03d2e; }
-  .m-noel .f2 .orn { background:#55654a; width:15px; height:15px; margin-left:-8px; bottom:-15px; }
-  .m-noel .f3 .orn { background:#c9a95c; }
-  .m-noel .f4 .orn { background:#55654a; width:14px; height:14px; margin-left:-7px; bottom:-14px; }
-  .m-noel .f5 .orn { background:#a03d2e; width:25px; height:25px; margin-left:-13px; bottom:-25px; }
-  /* saint-valentin : cœurs suspendus, deux tailles */
-  .m-coeur .orn { bottom:-17px; width:11px; height:11px; margin-left:-6px; background:#ab4a52; -webkit-transform:rotate(45deg); transform:rotate(45deg); }
-  .m-coeur .orn:before, .m-coeur .orn:after { content:''; position:absolute; width:11px; height:11px; border-radius:50%; background:inherit; }
-  .m-coeur .orn:before { left:-6px; top:0; }
-  .m-coeur .orn:after { left:0; top:-6px; }
-  .m-coeur .f2 .orn, .m-coeur .f4 .orn { width:8px; height:8px; margin-left:-4px; bottom:-13px; background:#c9737e; }
-  .m-coeur .f2 .orn:before, .m-coeur .f2 .orn:after, .m-coeur .f4 .orn:before, .m-coeur .f4 .orn:after { width:8px; height:8px; }
-  .m-coeur .f2 .orn:before, .m-coeur .f4 .orn:before { left:-4px; top:0; }
-  .m-coeur .f2 .orn:after, .m-coeur .f4 .orn:after { left:0; top:-4px; }
-  /* grande occasion : sequins losanges (doré, olive, terracotta) */
-  .m-fete .orn { bottom:-17px; width:13px; height:13px; margin-left:-7px; -webkit-transform:rotate(45deg); transform:rotate(45deg); }
-  .m-fete .f1 .orn { background:#c9a95c; }
-  .m-fete .f2 .orn { background:#75815f; width:10px; height:10px; margin-left:-5px; bottom:-14px; }
-  .m-fete .f3 .orn { background:#b96f45; }
-  .m-fete .f4 .orn { background:#c9a95c; width:10px; height:10px; margin-left:-5px; bottom:-14px; }
-  .m-fete .f5 .orn { background:#9a7b2c; width:15px; height:15px; margin-left:-8px; bottom:-19px; }
+
+  /* --- noël : cinq boules (attache dorée, ombre douce), hauteurs variées --- */
+  .m-noel .deco-fete .fil-noel { display:block; }
+  .deco-fete .no1 { left:338px; height:56px; }
+  .deco-fete .no2 { left:374px; height:94px; -webkit-animation-duration:4.6s; animation-duration:4.6s; }
+  .deco-fete .no3 { left:656px; height:102px; -webkit-animation-duration:5.2s; animation-duration:5.2s; }
+  .deco-fete .no4 { left:704px; height:60px; -webkit-animation-duration:4.1s; animation-duration:4.1s; }
+  .deco-fete .no5 { left:756px; height:126px; -webkit-animation-duration:4.9s; animation-duration:4.9s; }
+  .m-noel .fil-noel .orn { bottom:-20px; width:20px; height:20px; margin-left:-10px; border-radius:50%; box-shadow:inset -3px -4px 0 rgba(0,0,0,.10); }
+  .m-noel .fil-noel .orn:before { content:''; position:absolute; left:50%; top:-4px; width:6px; height:4px; margin-left:-3px; border-radius:1.5px; background:#c9a95c; }
+  .m-noel .no1 .orn { background:#a03d2e; }
+  .m-noel .no2 .orn { background:#55654a; width:15px; height:15px; margin-left:-8px; bottom:-15px; }
+  .m-noel .no3 .orn { background:#c9a95c; }
+  .m-noel .no4 .orn { background:#55654a; width:14px; height:14px; margin-left:-7px; bottom:-14px; }
+  .m-noel .no5 .orn { background:#a03d2e; width:25px; height:25px; margin-left:-13px; bottom:-25px; }
+
+  /* --- saint-valentin : deux cœurs entrelacés à droite, un petit solo à gauche --- */
+  .m-coeur .deco-fete .fil-coeur { display:block; }
+  .deco-fete .va1 { left:360px; height:64px; -webkit-animation-duration:4.4s; animation-duration:4.4s; }
+  .deco-fete .va2 { left:700px; height:84px; }
+  .deco-fete .va3 { left:726px; height:106px; -webkit-animation-duration:5.1s; animation-duration:5.1s; }
+  .m-coeur .fil-coeur .orn { background:#ab4a52; -webkit-transform:rotate(45deg); transform:rotate(45deg); }
+  .m-coeur .fil-coeur .orn:before, .m-coeur .fil-coeur .orn:after { content:''; position:absolute; border-radius:50%; background:inherit; width:100%; height:100%; }
+  .m-coeur .va1 .orn { bottom:-14px; width:9px; height:9px; margin-left:-5px; background:#c9737e; }
+  .m-coeur .va1 .orn:before { left:-5px; top:0; }
+  .m-coeur .va1 .orn:after { left:0; top:-5px; }
+  .m-coeur .va2 .orn { bottom:-24px; width:17px; height:17px; margin-left:-9px; }
+  .m-coeur .va2 .orn:before { left:-9px; top:0; }
+  .m-coeur .va2 .orn:after { left:0; top:-9px; }
+  .m-coeur .va3 .orn { bottom:-17px; width:12px; height:12px; margin-left:-6px; background:#c9737e; }
+  .m-coeur .va3 .orn:before { left:-6px; top:0; }
+  .m-coeur .va3 .orn:after { left:0; top:-6px; }
+
+  /* --- grande occasion : des ballons qui flottent (nœud + ficelle), rien ne pend --- */
+  .m-fete .deco-fete .ballon { display:block; }
+  .deco-fete .ballon { border-radius:50% 50% 50% 50% / 56% 56% 44% 44%; }
+  .deco-fete .ballon:before { content:''; position:absolute; left:50%; bottom:-5px; margin-left:-4px; border-left:4px solid transparent; border-right:4px solid transparent; border-top:6px solid #000; }
+  .deco-fete .ballon:after { content:''; position:absolute; left:50%; top:100%; margin-top:5px; margin-left:-1px; width:1.5px; height:48px; background:rgba(53,52,45,.20); -webkit-transform:rotate(5deg); transform:rotate(5deg); -webkit-transform-origin:top center; transform-origin:top center; }
+  .nuit .deco-fete .ballon:after { background:rgba(232,226,211,.16); }
+  @-webkit-keyframes flotte { 0% { -webkit-transform:translateY(0); } 100% { -webkit-transform:translateY(-6px); } }
+  @keyframes flotte { 0% { transform:translateY(0); } 100% { transform:translateY(-6px); } }
+  .deco-fete .ballon { -webkit-animation:flotte 3.4s ease-in-out infinite alternate; animation:flotte 3.4s ease-in-out infinite alternate; }
+  .deco-fete .ba1 { left:680px; top:22px; width:32px; height:40px; background:#c9a95c; }
+  .deco-fete .ba1:before { border-top-color:#c9a95c; }
+  .deco-fete .ba2 { left:718px; top:52px; width:25px; height:31px; background:#b96f45; -webkit-animation-duration:4.3s; animation-duration:4.3s; }
+  .deco-fete .ba2:before { border-top-color:#b96f45; }
+  .deco-fete .ba3 { left:652px; top:60px; width:21px; height:27px; background:#75815f; -webkit-animation-duration:5s; animation-duration:5s; }
+  .deco-fete .ba3:before { border-top-color:#75815f; }
+  .deco-fete .ba4 { left:352px; top:40px; width:23px; height:29px; background:#9a7b2c; -webkit-animation-duration:4.6s; animation-duration:4.6s; }
+  .deco-fete .ba4:before { border-top-color:#9a7b2c; }
 
   /* petit motif dessiné en css à côté du vœu (aucun émoji) */
   .date .fete .deco { display:none; }
@@ -519,11 +537,18 @@
   <div class="vue" id="vue-principal">
 
     <div class="deco-fete">
-      <span class="fil f1"><span class="orn"></span></span>
-      <span class="fil f2"><span class="orn"></span></span>
-      <span class="fil f3"><span class="orn"></span></span>
-      <span class="fil f4"><span class="orn"></span></span>
-      <span class="fil f5"><span class="orn"></span></span>
+      <span class="fil fil-noel no1"><span class="orn"></span></span>
+      <span class="fil fil-noel no2"><span class="orn"></span></span>
+      <span class="fil fil-noel no3"><span class="orn"></span></span>
+      <span class="fil fil-noel no4"><span class="orn"></span></span>
+      <span class="fil fil-noel no5"><span class="orn"></span></span>
+      <span class="fil fil-coeur va1"><span class="orn"></span></span>
+      <span class="fil fil-coeur va2"><span class="orn"></span></span>
+      <span class="fil fil-coeur va3"><span class="orn"></span></span>
+      <span class="ballon ba1"></span>
+      <span class="ballon ba2"></span>
+      <span class="ballon ba3"></span>
+      <span class="ballon ba4"></span>
     </div>
 
     <div class="head">la maison · lille</div>
