@@ -224,13 +224,14 @@ async function majMeteo() {
 function momentDuJour() {
   const p = parisParts(new Date());
   const md = p.month + '-' + p.day; // "12-24"
+  // les moments personnalisés (anniversaires…) priment sur les fêtes du calendrier
+  const perso = (CFG.moments || []).find(m => m && m.jour === md && m.texte);
+  if (perso) return { cls: 'm-fete', texte: String(perso.texte).toLowerCase() };
   if (md >= '12-20' && md <= '12-23') return { cls: 'm-noel', texte: "c'est bientôt noël" };
   if (md >= '12-24' && md <= '12-26') return { cls: 'm-noel', texte: 'joyeux noël' };
   if (md === '12-31') return { cls: 'm-fete', texte: 'bonne saint-sylvestre' };
   if (md === '01-01') return { cls: 'm-fete', texte: 'bonne année' };
   if (md === '02-14') return { cls: 'm-coeur', texte: 'joyeuse saint-valentin' };
-  const perso = (CFG.moments || []).find(m => m && m.jour === md && m.texte);
-  if (perso) return { cls: 'm-fete', texte: String(perso.texte).toLowerCase() };
   return null;
 }
 
