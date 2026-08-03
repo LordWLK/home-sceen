@@ -1081,14 +1081,20 @@
     mnAffiche(mnFin ? mnFin - (new Date()).getTime() : mnReste);
     return false;
   }
-  // double-toucher l'horloge (moins de 500 ms entre deux touchers)
+  // double-toucher l'horloge (moins de 600 ms entre deux touchers).
+  // ios 9 : un div nu ne reçoit pas de click → on écoute aussi touchend,
+  // et preventDefault évite le double comptage (touchend + click synthétique) et le zoom
   var mnDernierTap = 0;
-  document.getElementById('clock').onclick = function () {
+  function tapHorloge(e) {
+    if (e && e.preventDefault) e.preventDefault();
     var t = (new Date()).getTime();
-    if (t - mnDernierTap < 500) { ouvrirMinuteur(); }
-    mnDernierTap = t;
+    if (t - mnDernierTap < 600) { mnDernierTap = 0; ouvrirMinuteur(); }
+    else { mnDernierTap = t; }
     return false;
-  };
+  }
+  var elHorloge = document.getElementById('clock');
+  elHorloge.onclick = tapHorloge;
+  elHorloge.ontouchend = tapHorloge;
 
   // ---- écran ciné : 4 colonnes par jour (aujourd'hui / demain / surlendemain) ----
   var ciJours = [], ciLabels = [], ciDay = 0;
