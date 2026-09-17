@@ -71,23 +71,29 @@ Un seul process Node (`server.js`), une seule dépendance (`node-ical`).
 
 ## état d'avancement
 
-Fait et testé en local : serveur complet, template final, replis d'erreur par source, redirection, endpoints, auth Spotify script, README pas à pas.
+**En production.** Le serveur tourne sur le VPS Hostinger (service systemd `ecran-maison`, dossier `/root/ecran-maison`, mise à jour par `git pull origin main && systemctl restart ecran-maison`). L'iPad 3 est au mur et affiche la page en accès guidé. `config.json` (jamais commité : dépôt public) est rempli sur le VPS : calendriers maison + perso Antoine, clé football-data, Spotify, `moments` (anniversaires 23/12 Inès et 22/08 Antoine), `alerteUrl` ntfy pour le watchdog, `mmaFrancais` avec doumbe/baki. Instagram est bloqué depuis l'IP du VPS → `abonnesManuel` (13100 → « 13K ») fait foi.
 
-Reste à faire (avec l'utilisateur) :
+Testé en local via un harnais mock (faux `global.fetch` + fixtures + captures Playwright 1024×768) ; AlloCiné/iCloud/Instagram/ESPN sont inaccessibles depuis l'environnement de dev → calibrage via `debug-cine.js` et `debug-mma.js` lancés sur le VPS par l'utilisateur (qui a Termius sur iPhone avec un snippet « maj ecran »).
 
-1. `cp config.example.json config.json` et tout remplir
-2. URL ICS du calendrier iCloud partagé (à rendre public depuis l'app Calendrier)
-3. App Spotify + `node auth-spotify.js ID SECRET` sur le PC → refreshToken
-4. Clé football-data.org, vérifier les ids de `equipesFoot` (521/98/64/773) et les abréviations ESPN de `nba`
-5. `statsUrl` + adapter les 2 lignes de `majStudio()` au format réel
-6. Déploiement VPS : `npm install`, service systemd (unité fournie dans le README), ouvrir le port dans le pare-feu Hostinger
-7. iPad : ouvrir l'URL, "Sur l'écran d'accueil", verrouillage auto jamais, luminosité auto off, accès guidé
+## chantier en cours : kiosque Raspberry Pi 5 (deuxième écran)
+
+Objectif : un second écran (étage) affichant la même page — navigation indépendante par client (déjà le cas par construction), données partagées.
+
+- **Matériel prêt** : Pi 5 en boîtier Aolso (Active Cooler officiel), alim 27 W, microSD SanDisk **déjà flashée** : Raspberry Pi OS 64-bit, hostname `ecran-pi`, user `antoine`, Wi-Fi Freebox et SSH préconfigurés via Raspberry Pi Imager
+- **Écran** : Elo 1002L 10,1" 1280×800 récupéré, **non tactile** (réf. `0NWA` ; la version tactile est `2UWA`), entrée HDMI, alim 12 V ⎓ 2 A **manquante** (prise coaxiale broche 2 mm type EIAJ → alim universelle multi-embouts, ou bloc Elo d'occasion). Un 1002L **tactile** d'occasion à 40 € était en cours d'achat sur Leboncoin (vérification de la réf. 2UWA demandée au vendeur)
+- **Reste à faire** : premier démarrage du Pi, ajout de l'hôte dans Termius (`ecran-pi.local`), installation du mode kiosque (Chromium `--kiosk` sur l'URL du VPS, autostart, veille écran désactivée, curseur masqué), fixation au dos de l'écran (velcro adhésif)
+- Note watchdog : avec deux clients, `dernierPoll` ne distingue pas iPad et Pi (si l'un meurt et l'autre polle, pas d'alerte) — à différencier si besoin
 
 ## backlog d'idées (non engagé)
 
+- **Télécommande téléphone** : page mobile `/pilote` → le serveur stocke une commande → les clients (qui pollent déjà toutes les 2 s) l'exécutent (`montrer(...)`) ; permet de piloter l'écran non tactile du haut. Conçu, non commencé
+- Liste de courses partagée (saisie téléphone, écran cochable) — le favori de l'utilisateur après la télécommande
+- Chauffage : l'écran placeholder existe déjà (menu météo & maison) ; brancher un thermostat cloud (Netatmo/Tado/Cozytouch) sur le modèle Spotify, borner les consignes
 - Rotation de contenus dans l'arche centrale selon l'heure (matin : agenda, soir : sport)
+- Résultats NBA/UFC (le foot est fait) ; KSW/ARES via scraping Wikipédia
 - Classement MPP "La Fricadelle Compétition" pendant les compétitions
 - yum.ines via l'API Graph de Meta (chiffre exact fiable, remplace le scraping bloqué)
+- Ménage cochable (tâche faite → tamisée, même mécanique que l'épinglage)
 
 ## comment tester sans iPad
 
