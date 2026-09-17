@@ -81,7 +81,9 @@ Objectif : un second écran (étage) affichant la même page — navigation ind�
 
 - **Matériel prêt** : Pi 5 en boîtier Aolso (Active Cooler officiel), alim 27 W, microSD SanDisk **déjà flashée** : Raspberry Pi OS 64-bit, hostname `ecran-pi`, user `antoine`, Wi-Fi Freebox et SSH préconfigurés via Raspberry Pi Imager
 - **Écran** : Elo 1002L 10,1" 1280×800 récupéré, **non tactile** (réf. `0NWA` ; la version tactile est `2UWA`), entrée HDMI, alim 12 V ⎓ 2 A **manquante** (prise coaxiale broche 2 mm type EIAJ → alim universelle multi-embouts, ou bloc Elo d'occasion). Un 1002L **tactile** d'occasion à 40 € était en cours d'achat sur Leboncoin (vérification de la réf. 2UWA demandée au vendeur)
-- **Reste à faire** : premier démarrage du Pi, ajout de l'hôte dans Termius (`ecran-pi.local`), installation du mode kiosque (Chromium `--kiosk` sur l'URL du VPS, autostart, veille écran désactivée, curseur masqué), fixation au dos de l'écran (velcro adhésif)
+- **Outillage prêt (côté dépôt)** : `deploy/pi/kiosque.sh` installe tout le mode kiosque en une commande (Chromium `--kiosk`, autostart labwc, veille écran coupée, wi-fi sans économie d'énergie, relance automatique si Chromium tombe) ; `deploy/pi/etat.sh` sort un diagnostic à coller dans la conversation ; `deploy/pi/README.md` détaille la marche à suivre. Le lanceur ajoute `?kiosque` à l'URL : la page pose alors la classe `kiosque` sur `<html>` et masque le curseur (le Pi n'a pas d'écran tactile). Le script cible Raspberry Pi OS Trixie (bureau **labwc**, paquet `chromium`) et retombe sur wayfire si besoin
+- **Reste à faire** : premier démarrage du Pi, ajout de l'hôte dans Termius (`ecran-pi.local`), lancer `kiosque.sh`, fixation au dos de l'écran (velcro adhésif)
+- **Format 1280×800** : la page est dessinée en 1024×768 et `fit()` plafonne l'échelle à 1 → sur le Pi elle s'affiche 1:1 avec des bandes du fond sombre autour. Quatre maquettes explorées (bandes sombres telles quelles / bandes ivoire / scène élargie à 1280×800 / scène élargie + arches à 360 px) : **en attente de validation, rien n'est construit**
 - Note watchdog : avec deux clients, `dernierPoll` ne distingue pas iPad et Pi (si l'un meurt et l'autre polle, pas d'alerte) — à différencier si besoin
 
 ## backlog d'idées (non engagé)
@@ -97,4 +99,10 @@ Objectif : un second écran (étage) affichant la même page — navigation ind�
 
 ## comment tester sans iPad
 
-`node server.js` puis ouvrir `http://localhost:8017/<basePath>/` dans un navigateur : la page s'affiche à l'échelle. Les sources en échec loggent `[maj] … en échec` et gardent leur dernier contenu, le serveur ne crashe jamais pour une source morte.
+Avec un `config.json` réel : `node server.js` puis ouvrir `http://localhost:8017/<basePath>/` dans un navigateur.
+
+**Sans config ni réseau** (cas de l'environnement de dev, qui ne joint ni AlloCiné ni iCloud ni Instagram ni ESPN) : `node test/mock.js` → `http://localhost:8017/maison-mock/`. Le harnais remplace `global.fetch` et `ical.async.fromURL` par des fixtures datées par rapport à aujourd'hui (météo, deux calendriers, foot avec résultat, NBA, UFC avec un Français à la carte, quatre cinémas avec séances sur deux jours, Spotify avec pochette PNG générée), écrit un `config.json` jetable dans `test/tmp/` et lance le vrai `server.js` dessus — via `ECRAN_CONFIG`, la seule variable d'environnement que le serveur lit. Variantes : `PORT=8099`, `MOCK_MUSIQUE=0` (rien ne joue), `MOCK_VERBOSE=1` (trace les requêtes simulées).
+
+Captures : le harnais tournant, `NODE_PATH=$(npm root -g) node test/capture.js` écrit dans `test/tmp/captures/` l'accueil iPad 1024×768 et les variantes 1280×800 du kiosque Pi. `test/tmp/` est gitignoré.
+
+Les sources en échec loggent `[maj] … en échec` et gardent leur dernier contenu, le serveur ne crashe jamais pour une source morte.

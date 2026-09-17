@@ -21,6 +21,10 @@
     overflow:hidden;
   }
 
+  /* kiosque (raspberry pi, écran non tactile) : ?kiosque dans l'url → curseur masqué.
+     la classe est sur <html> car body.className est réécrit à chaque tick */
+  html.kiosque, html.kiosque * { cursor:none; }
+
   #fit { position:absolute; top:0; left:0; }
   #stage {
     width:1024px; height:768px;
@@ -775,6 +779,9 @@
   // mise à l'échelle : 1:1 sur l'ipad, réduit proprement ailleurs
   // anti-marquage lcd : tout l'écran glisse d'un pixel selon un petit cycle,
   // imperceptible mais suffisant pour ne pas figer la même image des heures
+  // kiosque (raspberry pi) : ?kiosque dans l'url → classe sur <html>
+  if (/[?&]kiosque/.test(window.location.search)) { document.documentElement.className += ' kiosque'; }
+
   var decCycle = [[0, 0], [1, 0], [1, 1], [0, 1]], decIdx = 0;
   function fit() {
     var s = Math.min(window.innerWidth / 1024, window.innerHeight / 768);

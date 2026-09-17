@@ -9,7 +9,9 @@ const fs = require('fs');
 const path = require('path');
 const ical = require('node-ical');
 
-const CFG = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+// chemin du config : ECRAN_CONFIG (harnais de test) sinon config.json à côté du serveur
+const CONFIG_PATH = process.env.ECRAN_CONFIG || path.join(__dirname, 'config.json');
+const CFG = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 const TEMPLATE = fs.readFileSync(path.join(__dirname, 'template.html'), 'utf8');
 const TZ = 'Europe/Paris';
 
@@ -956,7 +958,7 @@ async function tokenSpotify() {
     // spotify fait tourner les refresh tokens (durée de vie 180 j en mode development) :
     // on persiste le nouveau pour ne jamais casser la chaîne
     CFG.spotify.refreshToken = j.refresh_token;
-    fs.writeFile(path.join(__dirname, 'config.json'), JSON.stringify(CFG, null, 2) + '\n',
+    fs.writeFile(CONFIG_PATH, JSON.stringify(CFG, null, 2) + '\n',
       e => { if (e) console.log('[spotify] échec sauvegarde du refresh token :', e.message); });
   }
   return spotifyAccess.token;
