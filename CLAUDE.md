@@ -71,11 +71,23 @@ Un seul process Node (`server.js`), une seule dépendance (`node-ical`).
 
 ## état d'avancement
 
-**En production.** Le serveur tourne sur le VPS Hostinger (service systemd `ecran-maison`, dossier `/root/ecran-maison`, mise à jour par `git pull origin main && systemctl restart ecran-maison`). L'iPad 3 est au mur et affiche la page en accès guidé. `config.json` (jamais commité : dépôt public) est rempli sur le VPS : calendriers maison + perso Antoine, clé football-data, Spotify, `moments` (anniversaires 23/12 Inès et 22/08 Antoine), `alerteUrl` ntfy pour le watchdog, `mmaFrancais` avec doumbe/baki. Instagram est bloqué depuis l'IP du VPS → `abonnesManuel` (13100 → « 13K ») fait foi.
+**En production.** Le serveur tourne sur le VPS Hostinger (service systemd `ecran-maison`, dossier `/root/ecran-maison`, mise à jour par `git pull origin main && systemctl restart ecran-maison`). L'iPad 3 est au mur et affiche la page en accès guidé. `config.json` (jamais commité : dépôt public) est rempli sur le VPS : calendriers maison + perso Antoine, clé football-data, Spotify, `moments` (anniversaires 23/12 Inès et 22/08 Antoine), `alerteUrl` ntfy pour le watchdog, `mmaFrancais` avec doumbe/baki. Instagram est bloqué depuis l'IP du VPS → `abonnesManuel` (13100 → « 13K ») fait foi, mis à jour par `bash outils/abonnes.sh N` (écrit config.json puis redémarre le service ; le pendentif affiche ensuite l'écart pendant 7 jours).
 
 Testé en local via un harnais mock (faux `global.fetch` + fixtures + captures Playwright 1024×768) ; AlloCiné/iCloud/Instagram/ESPN sont inaccessibles depuis l'environnement de dev → calibrage via `debug-cine.js` et `debug-mma.js` lancés sur le VPS par l'utilisateur (qui a Termius sur iPhone avec un snippet « maj ecran »).
 
-## chantier en cours : kiosque Raspberry Pi 5 (deuxième écran)
+## chantier en cours : chauffage Netatmo
+
+- **Matériel** : thermostat Netatmo relié à la chaudière posé en novembre 2026. Vannes connectées de radiateurs pas encore installées : une seule pièce chauffée pour l'instant, mais prévoir plusieurs pièces plus tard
+- **Accès API** : app perso sur dev.netatmo.com, jeton créé avec le Token generator (scopes `read_thermostat` + `write_thermostat`), rangé par `outils/netatmo.sh` dans `config.netatmo` {clientId, clientSecret, refreshToken}. **Rotation des jetons** : depuis mai 2024, chaque renouvellement invalide l'ancien. Le jeton courant vit donc dans `netatmo-jeton.json` (gitignoré, écriture atomique, mode 600) : `{depuis, refresh, acces, expire}`. `depuis` = le refreshToken de config.json à l'origine de la chaîne ; s'il diffère (jeton régénéré et recollé), on repart de config. Jamais dans config.json, que le serveur réécrit en entier à la rotation Spotify et où il écraserait un jeton tourné. Le jeton d'accès (3 h) est réutilisé tant qu'il est valide, pour que le serveur et `debug-netatmo.js` ne se marchent pas dessus
+- **API** (POST en formulaire, `Authorization: Bearer`) : `oauth2/token` ; `api/homesdata` (pièces, modules, programmes ; contient un bloc `user` avec l'e-mail, ne jamais l'afficher) ; `api/homestatus` + home_id (mesuré, consigne, mode, fin, `boiler_status` du module NATherm1/OTM/BNS, `anticipating`, `open_window`) ; `api/setroomthermpoint` (home_id, room_id, mode manual|home|max, temp, endtime) ; `api/setthermmode` (mode schedule|away|hg, endtime). Programme : `timetable` [{zone_id, m_offset en minutes depuis lundi 0 h}], zones de type 0 confort, 1 nuit, 5 éco, 8 confort +, 4 perso ; températures dans `zones[].rooms[].therm_setpoint_temperature` ou `rooms_temp[].temp`. Référence : la bibliothèque pyatmo (Home Assistant) et ses fixtures
+- **Limites** : 50 requêtes par 10 s et 500 par heure et par utilisateur ; une baisse est annoncée pour mars 2027 (source secondaire, non confirmée) : interroger `homestatus` toutes les 5 min au plus, plus juste après une commande
+- **Calibrage** : `debug-netatmo.js` (lancé à la fin de `outils/netatmo.sh`) résume maisons, pièces, modules, état et programme du jour ; n'affiche ni jeton, ni secret, ni e-mail. Testé contre un faux Netatmo nourri des fixtures pyatmo (rotation, révocation, jeton recollé, erreurs)
+- **Maquettes en attente de validation, rien n'est construit** : écran chauffage en trois arches comme l'accueil. Olive « dehors » (météo), terracotta centrale plus haute « dedans » (température mesurée en Optima géante, flamme CSS et « chauffe en cours » ou « chaudière au repos », consigne entre deux boutons ronds −/+), sable « aujourd'hui » (créneaux du programme, passés tamisés, créneau en cours marqué du point `next`). Ligne d'état Georgia italique sous le titre, sélecteur programme / absent / hors-gel en pastilles comme le ciné. Menu météo & maison : la carte chauffage s'allume (température et consigne), la carte prévisions gagne « demain » pour l'équilibre. Accueil, deux options : B, « la maison · 18,6° » dans la tête ; C, ligne « dedans 18,6° » dans le bloc météo, terracotta quand ça chauffe (recommandée : le bloc météo mène déjà au menu chauffage). Les maquettes sont injectées par Playwright sur le harnais, script non versionné
+- **Reste à faire** : l'utilisateur crée l'app Netatmo et lance `outils/netatmo.sh`, puis colle la sortie ; validation des maquettes ; construction (majChauffage, endpoints `/chauffage/*` aux consignes bornées, appuis −/+ cumulés côté client avant un seul envoi, fixtures Netatmo dans `test/mock.js`)
+
+## chantier en pause : kiosque Raspberry Pi 5 (deuxième écran)
+
+En pause depuis novembre 2026 : l'utilisateur ne s'y est pas encore mis.
 
 Objectif : un second écran (étage) affichant la même page — navigation indépendante par client (déjà le cas par construction), données partagées.
 
@@ -90,7 +102,7 @@ Objectif : un second écran (étage) affichant la même page — navigation ind�
 
 - **Télécommande téléphone** : page mobile `/pilote` → le serveur stocke une commande → les clients (qui pollent déjà toutes les 2 s) l'exécutent (`montrer(...)`) ; permet de piloter l'écran non tactile du haut. Conçu, non commencé
 - Liste de courses partagée (saisie téléphone, écran cochable) — le favori de l'utilisateur après la télécommande
-- Chauffage : l'écran placeholder existe déjà (menu météo & maison) ; brancher un thermostat cloud (Netatmo/Tado/Cozytouch) sur le modèle Spotify, borner les consignes
+- Chauffage : voir le chantier en cours (Netatmo) ; vannes de radiateurs à intégrer quand elles seront posées
 - Rotation de contenus dans l'arche centrale selon l'heure (matin : agenda, soir : sport)
 - Résultats NBA/UFC (le foot est fait) ; KSW/ARES via scraping Wikipédia
 - Classement MPP "La Fricadelle Compétition" pendant les compétitions
@@ -104,5 +116,7 @@ Avec un `config.json` réel : `node server.js` puis ouvrir `http://localhost:801
 **Sans config ni réseau** (cas de l'environnement de dev, qui ne joint ni AlloCiné ni iCloud ni Instagram ni ESPN) : `node test/mock.js` → `http://localhost:8017/maison-mock/`. Le harnais remplace `global.fetch` et `ical.async.fromURL` par des fixtures datées par rapport à aujourd'hui (météo, deux calendriers, foot avec résultat, NBA, UFC avec un Français à la carte, quatre cinémas avec séances sur deux jours, Spotify avec pochette PNG générée), écrit un `config.json` jetable dans `test/tmp/` et lance le vrai `server.js` dessus — via `ECRAN_CONFIG`, la seule variable d'environnement que le serveur lit. Variantes : `PORT=8099`, `MOCK_MUSIQUE=0` (rien ne joue), `MOCK_VERBOSE=1` (trace les requêtes simulées).
 
 Captures : le harnais tournant, `NODE_PATH=$(npm root -g) node test/capture.js` écrit dans `test/tmp/captures/` l'accueil iPad 1024×768 et les variantes 1280×800 du kiosque Pi. `test/tmp/` est gitignoré.
+
+Netatmo n'est pas encore simulé par le harnais (à faire à la construction du chauffage).
 
 Les sources en échec loggent `[maj] … en échec` et gardent leur dernier contenu, le serveur ne crashe jamais pour une source morte.

@@ -3,3 +3,5 @@ config.json
 studio-historique.json
 epingles.json
 test/tmp/
+netatmo-jeton.json
+netatmo-jeton.json.tmp

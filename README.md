@@ -93,6 +93,30 @@ L'affiche est rafraîchie toutes les 6 h (scraping poli d'allociné ; si la stru
 
 Le pendentif terracotta en haut de l'écran affiche les abonnés Instagram du compte configuré dans `instagram` (lecture du profil public toutes les 6 h, historique local pour le « +X sur 7 jours »). Masqué tant que rien n'est configuré ou que la source échoue. Si un endpoint dédié existe un jour, le renseigner dans `statsUrl` : il devient prioritaire.
 
+Instagram bloque l'IP du VPS : c'est `abonnesManuel` qui fait foi. Pour le mettre à jour, une ligne sur le VPS, qui redémarre aussi le service :
+
+```bash
+bash outils/abonnes.sh 14250
+```
+
+Pendant les sept jours suivants, le pendentif affiche aussi l'écart avec l'ancienne valeur (« +X sur 7 jours »).
+
+## 5 bis · chauffage (thermostat netatmo)
+
+Le thermostat Netatmo se pilote par l'API officielle, avec une app personnelle créée une fois :
+
+1. Sur [dev.netatmo.com](https://dev.netatmo.com), se connecter avec le compte de l'app Netatmo, puis « My apps » → « Create ». Remplir nom, description, nom et e-mail du responsable des données (soi-même), accepter les conditions, enregistrer. La page de l'app affiche le **client ID** et le **client secret**.
+2. En bas de la même page, « Token generator » : cocher **read_thermostat** et **write_thermostat**, puis « Generate Token » et accepter. Copier le **refresh token**.
+3. Sur le VPS :
+
+```bash
+cd /root/ecran-maison && git pull origin main && bash outils/netatmo.sh
+```
+
+   Le script demande les trois valeurs (saisie masquée), les range dans `config.json` sous `netatmo`, redémarre le service et lance `debug-netatmo.js`, qui résume maisons, pièces, modules, état et programme du jour.
+
+Netatmo invalide l'ancien jeton à chaque renouvellement : le jeton courant vit dans `netatmo-jeton.json` (gitignoré), jamais dans `config.json`. Ne pas supprimer ce fichier. Si la chaîne casse (`invalid_grant`), régénérer un jeton à l'étape 2 et relancer `outils/netatmo.sh`.
+
 ## 6 · chemin secret et lancement
 
 Personnaliser `basePath` dans `config.json` (garder un truc improbable). Puis :
