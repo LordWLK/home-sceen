@@ -11,6 +11,7 @@
             MOCK_VERBOSE=1 node test/mock.js  (trace chaque requête simulée)
             MOCK_NETATMO=0 node test/mock.js  (pas de thermostat configuré)
             MOCK_NETATMO=panne node test/mock.js  (api netatmo injoignable)
+            MOCK_DEDANS=16.8 node test/mock.js  (température mesurée du thermostat simulé)
 
    captures : NODE_PATH=$(npm root -g) node test/capture.js   (voir capture.js) */
 'use strict';
@@ -232,7 +233,8 @@ function enCours() {
    une maison, la salle à manger, relais NAPlug + thermostat NATherm1, programme
    « Mon planning de chauffe » : nuit 17° jusqu'à 8 h, confort 20° jusqu'à 23 h, tous les jours.
    jetons tournants comme le vrai : seul le dernier refresh token émis est accepté. */
-const NT = { valide: 'mock-refresh-0', n: 0, acces: '', modeMaison: 'schedule', manuel: null, mesure: 19.4 };
+// MOCK_DEDANS=16.8 : pièce plus froide que la consigne, la chaudière chauffe
+const NT = { valide: 'mock-refresh-0', n: 0, acces: '', modeMaison: 'schedule', manuel: null, mesure: parseFloat(process.env.MOCK_DEDANS) || 19.4 };
 const NT_HOME = 'mock-home', NT_ROOM = 'mock-room', NT_THERM = '70:ee:50:00:00:01', NT_PLUG = '70:ee:50:00:00:02';
 const ntZone = (id, type, name, t) => ({ id: id, type: type, name: name, rooms: [{ id: NT_ROOM, therm_setpoint_temperature: t }] });
 const NT_TIMETABLE = [{ zone_id: 1, m_offset: 0 }];
@@ -285,7 +287,11 @@ function netatmoFaux(chemin, opt) {
     else if (p.get('mode') === 'home') NT.manuel = null;
     return ok();
   }
-  if (chemin === 'api/setthermmode') { NT.modeMaison = p.get('mode'); return ok(); }
+  if (chemin === 'api/setthermmode') {
+    NT.modeMaison = p.get('mode');
+    if (NT.modeMaison !== 'schedule') NT.manuel = null; // absent et hors-gel annulent un réglage manuel
+    return ok();
+  }
   return new Response(JSON.stringify({ error: { code: 404, message: 'inconnu' } }), { status: 404 });
 }
 

@@ -49,6 +49,13 @@
     display:block; margin-top:6px; font-size:11px;
     letter-spacing:.18em; opacity:.75;
   }
+  /* température intérieure (thermostat) : discrète, terracotta avec une flamme quand ça chauffe */
+  .meteo .mdedans { display:block; margin-top:6px; font-size:11px; letter-spacing:.18em; opacity:.75; }
+  .meteo .mdedans.chauffe { color:#b96f45; opacity:1; }
+  .meteo .mdedans .flamme { width:8px; height:8px; margin:0 0 1px 9px; background:#b96f45; }
+  .meteo .mdedans .flamme:after { background:#f6d2ae; width:3px; height:3px; }
+  .nuit .meteo .mdedans.chauffe { color:#c98b60; }
+  .nuit .meteo .mdedans .flamme { background:#c98b60; }
   .meteo .mconseil {
     display:block; margin-top:7px; max-width:340px; margin-left:auto;
     font-family:Georgia, serif; font-style:italic; font-weight:400;
@@ -100,6 +107,9 @@
   #vue-meteo-menu .carte .cs { font-size:12px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; margin-top:14px; opacity:.8; }
   #vue-meteo-menu .carte.prev { background:#75815f; color:#f4f0e4; }
   #vue-meteo-menu .carte.chauf { background:#b96f45; color:#f6f1e8; opacity:.55; }
+  #vue-meteo-menu .carte.chauf.on { opacity:1; }
+  #vue-meteo-menu .carte .cv { font-family:"Optima","Avenir Next",sans-serif; font-size:58px; font-weight:500; line-height:1; margin-top:20px; }
+  #vue-meteo-menu .carte .cv + .cs { margin-top:16px; }
   .nuit #vue-meteo-menu { background:#2e2d28; }
   .nuit #vue-meteo-menu .carte.prev { background:#525c43; color:#ddd8c9; }
   .nuit #vue-meteo-menu .carte.chauf { background:#96593a; color:#e8ddd1; }
@@ -166,13 +176,52 @@
   .nuit .pico.ico-pluie i { background:#847d6e; }
   .nuit .pico.ico-neige i { background:#a9a292; }
 
-  /* ---------- écran chauffage (réservé, rien branché encore) ---------- */
+  /* ---------- écran chauffage (thermostat netatmo) : trois arches comme l'accueil ---------- */
   #vue-chauffage { background:#f6f1e8; }
   #vue-chauffage .titre-ecran { color:#8a4a28; }
+  /* repli tant que le thermostat n'est pas branché, ou pas encore lu */
   #vue-chauffage .bientot { position:absolute; left:0; right:0; top:300px; text-align:center; font-family:Georgia,serif; font-style:italic; font-size:52px; color:#b96f45; }
   #vue-chauffage .explic { position:absolute; left:0; right:0; top:388px; text-align:center; font-size:13px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#a2947c; }
+  #vue-chauffage .ch-etat { position:absolute; left:0; right:0; top:134px; text-align:center; font-family:Georgia,serif; font-style:italic; font-size:16px; color:#a2947c; }
+  #vue-chauffage .ch-etat.erreur { color:#b96f45; }
+  #vue-chauffage .modes { position:absolute; left:0; right:0; top:178px; text-align:center; }
+  #vue-chauffage .modes span { display:inline-block; font-family:Georgia,serif; font-style:italic; font-size:17px; color:#a98a72; padding:6px 18px; margin:0 4px; border-radius:16px; }
+  #vue-chauffage .modes span.on { color:#fff; background:#b96f45; }
+  #vue-chauffage .arch h3 { margin-bottom:12px; }
+  #vue-chauffage .ch-temp { font-family:"Optima","Avenir Next",sans-serif; font-size:80px; font-weight:500; line-height:1; }
+  #vue-chauffage .ch-dehors .ch-temp { font-size:60px; margin-top:8px; }
+  #vue-chauffage .ch-dehors .it { padding-top:16px; }
+  #vue-chauffage .ch-dedans { padding-top:98px; }
+  #vue-chauffage .ch-prog { padding-top:78px; }
+  #vue-chauffage .ch-statut { margin-top:14px; font-size:11.5px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; color:#f4e9d2; }
+  #vue-chauffage .ch-statut.repos { opacity:.7; }
+  #vue-chauffage .ch-reg {
+    display:-webkit-flex; display:flex;
+    -webkit-align-items:center; align-items:center;
+    -webkit-justify-content:space-between; justify-content:space-between;
+    margin-top:34px;
+  }
+  #vue-chauffage .ch-reg.off { opacity:.3; } /* absent ou hors-gel : on repasse d'abord au programme */
+  #vue-chauffage .ch-btn { display:block; width:56px; height:56px; border-radius:50%; border:1px solid rgba(246,241,232,.6); position:relative; -webkit-flex:0 0 auto; flex:0 0 auto; }
+  #vue-chauffage .ch-btn:active { background:rgba(0,0,0,.12); }
+  #vue-chauffage .ch-btn.ic-moins:before, #vue-chauffage .ch-btn.ic-plus:before { left:18px; top:25px; width:18px; height:4px; background:#f6f1e8; }
+  #vue-chauffage .ch-btn.ic-plus:after { left:25px; top:18px; width:4px; height:18px; background:#f6f1e8; }
+  #vue-chauffage .ch-val { text-align:center; font-family:"Optima","Avenir Next",sans-serif; font-size:36px; font-weight:500; line-height:1; }
+  #vue-chauffage .ch-val small { display:block; font-family:"Avenir Next","Helvetica Neue",sans-serif; font-size:10.5px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; opacity:.8; margin-bottom:8px; }
+  #vue-chauffage .ch-prog .it { padding:6px 0; font-size:16.5px; }
+  #vue-chauffage .ch-prog .it small { font-size:10.5px; letter-spacing:.16em; }
+  #vue-chauffage .ch-prog .it.passe { opacity:.42; }
+  #vue-chauffage .ch-prog .suspendu { opacity:.45; } /* absent ou hors-gel : le programme ne s'applique pas */
   .nuit #vue-chauffage { background:#2e2d28; }
+  .nuit #vue-chauffage .titre-ecran { color:#c98b60; }
   .nuit #vue-chauffage .bientot { color:#c98b60; }
+  .nuit #vue-chauffage .modes span { color:#9c8874; }
+  .nuit #vue-chauffage .modes span.on { color:#fff; background:#a05a34; }
+  .nuit #vue-chauffage .ch-etat { color:#9b917d; }
+  .nuit #vue-chauffage .ch-etat.erreur { color:#c98b60; }
+  /* flamme dessinée en css : goutte pointe en haut, cœur ambré (chaudière en chauffe) */
+  .flamme { display:inline-block; position:relative; width:11px; height:11px; margin-right:10px; background:#f4e9d2; border-radius:0 50% 50% 50%; -webkit-transform:rotate(45deg); transform:rotate(45deg); }
+  .flamme:after { content:''; position:absolute; right:1px; bottom:1px; width:5px; height:5px; background:#e0975e; border-radius:0 50% 50% 50%; }
 
   /* ---------- minuteur de cuisine (double-toucher l'horloge) ---------- */
   #vue-minuteur { background:#f6f1e8; }
@@ -693,11 +742,11 @@
     <div class="retour" onclick="montrer('vue-principal')">accueil</div>
     <div class="titre-ecran">météo &amp; maison</div>
     <div class="choix">
-      <div class="carte prev" onclick="return ouvrirPrevisions()">
+      <div class="carte prev" id="carte-prev" onclick="return ouvrirPrevisions()">
         <div class="ct">les jours à venir</div>
         <div class="cs">prévisions sur 7 jours</div>
       </div>
-      <div class="carte chauf" onclick="return ouvrirChauffage()">
+      <div class="carte chauf" id="carte-chauf" onclick="return ouvrirChauffage()">
         <div class="ct">chauffage</div>
         <div class="cs">bientôt</div>
       </div>
@@ -714,8 +763,28 @@
   <div class="vue" id="vue-chauffage" style="display:none">
     <div class="retour" onclick="montrer('vue-principal')">accueil</div>
     <div class="titre-ecran">chauffage</div>
-    <div class="bientot">bientôt</div>
-    <div class="explic">la chaudière et les thermostats se brancheront ici</div>
+    <div class="ch-etat" id="ch-etat" style="display:none"></div>
+    <div class="modes" id="ch-modes" style="display:none">
+      <span id="ch-m-programme" onclick="return chMode('programme')">programme</span>
+      <span id="ch-m-absent" onclick="return chMode('absent')">absent</span>
+      <span id="ch-m-horsgel" onclick="return chMode('horsgel')">hors-gel</span>
+    </div>
+    <div class="arches" id="ch-arches" style="display:none">
+      <div class="arch olive ch-dehors"><h3>dehors</h3><div id="ch-dehors"></div></div>
+      <div class="arch terra centre ch-dedans">
+        <h3>dedans</h3>
+        <div class="ch-temp" id="ch-mesure"></div>
+        <div class="ch-statut" id="ch-statut"></div>
+        <div class="ch-reg" id="ch-reg">
+          <a href="#" class="ch-btn ic-moins" onclick="return chPas(-1)" aria-label="baisser la consigne"></a>
+          <div class="ch-val"><small id="ch-lbl">consigne</small><span id="ch-val"></span></div>
+          <a href="#" class="ch-btn ic-plus" onclick="return chPas(1)" aria-label="monter la consigne"></a>
+        </div>
+      </div>
+      <div class="arch sable ch-prog"><h3>aujourd'hui</h3><div id="ch-prog"></div></div>
+    </div>
+    <div class="bientot" id="ch-attente">bientôt</div>
+    <div class="explic" id="ch-explic">la chaudière et les thermostats se brancheront ici</div>
   </div>
 
   <div class="vue" id="vue-minuteur" style="display:none">
@@ -934,6 +1003,7 @@
             if (d.cinemaJours) { ciJours = d.cinemaJours; ciLabels = d.cinemaLabels || []; if (vueActive === 'vue-cine') ciRender(); }
             if (d.soleil && d.soleil.coucher) { soleil = d.soleil; soleilReel = true; }
             if (typeof d.meteoPrevisions === 'string') { mtPrev = d.meteoPrevisions; if (vueActive === 'vue-previsions') { document.getElementById('pv-cols').innerHTML = mtPrev; pvSous(); } }
+            chContenu(d);
             momentTexte = String((d.moment && d.moment.texte) || '').replace(/</g, '&lt;');
             momentCls = (d.moment && d.moment.cls) || '';
             tick();
@@ -1020,7 +1090,121 @@
     pvSous();
     return false;
   }
-  function ouvrirChauffage() { montrer('vue-chauffage'); return false; }
+  // ---- écran chauffage (thermostat netatmo) : données de /contenu, commandes en xhr ----
+  // les appuis −/+ se cumulent et partent en un seul envoi 1,5 s après le dernier
+  var chData = null, chActif = false, chDehors = null, chDemain = null;
+  var chPending = null, chTimer = null, chBusy = false, chErreurJusqua = 0;
+  function chEl(id) { return document.getElementById(id); }
+  function chEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+  function chFmt(t) { return String(Math.round(t * 10) / 10).replace('.', ',') + '°'; }
+  function chBase(m) { return m === 'away' ? 'absent' : (m === 'hg' ? 'horsgel' : 'programme'); }
+  function chRender() {
+    var ok = !!(chData && !chData.attente), i, ids = ['ch-etat', 'ch-modes', 'ch-arches'];
+    for (i = 0; i < ids.length; i++) { chEl(ids[i]).style.display = ok ? '' : 'none'; }
+    chEl('ch-attente').style.display = ok ? 'none' : '';
+    chEl('ch-explic').style.display = ok ? 'none' : '';
+    if (!ok) {
+      chEl('ch-attente').innerHTML = chActif ? 'un instant' : 'bientôt';
+      chEl('ch-explic').innerHTML = chActif ? 'lecture du thermostat en cours' : 'la chaudière et les thermostats se brancheront ici';
+      return;
+    }
+    var d = chData, base = chBase(d.mode), modes = ['programme', 'absent', 'horsgel'];
+    if (new Date().getTime() >= chErreurJusqua) { chEl('ch-etat').innerHTML = chEsc(d.etat); chEl('ch-etat').className = 'ch-etat'; }
+    for (i = 0; i < modes.length; i++) { chEl('ch-m-' + modes[i]).className = modes[i] === base ? 'on' : ''; }
+    chEl('ch-dehors').innerHTML = chDehors
+      ? '<div class="ch-temp">' + chEsc(chDehors.temp) + '</div><div class="it">' + chEsc(chDehors.libelle) + '<small>' + chEsc(chDehors.minmax) + '</small></div>'
+      : '<div class="ch-temp">&nbsp;</div>';
+    chEl('ch-mesure').innerHTML = chEsc(d.mesureTxt);
+    chEl('ch-statut').innerHTML = (d.chauffe ? '<i class="flamme"></i>' : '') + chEsc(d.statut);
+    chEl('ch-statut').className = 'ch-statut' + (d.chauffe ? '' : ' repos');
+    chEl('ch-val').innerHTML = chPending !== null ? chFmt(chPending) : chEsc(d.consigneTxt);
+    chEl('ch-lbl').innerHTML = chBusy ? 'envoi' : (chPending !== null ? 'réglage' : 'consigne');
+    chEl('ch-reg').className = 'ch-reg' + (base === 'programme' ? '' : ' off');
+    var h = '', p = d.programme || [];
+    for (i = 0; i < p.length; i++) {
+      h += '<div class="it' + (p[i].etat === 'passe' ? ' passe' : (p[i].etat === 'en-cours' ? ' next' : '')) + '">' +
+        chEsc(p[i].nom) + ' · ' + chEsc(p[i].temp) + '<small>' + chEsc(p[i].quand) + '</small></div>';
+    }
+    chEl('ch-prog').innerHTML = h;
+    chEl('ch-prog').className = base === 'programme' ? '' : 'suspendu';
+  }
+  // menu météo & maison : carte chauffage allumée, « demain » sur la carte des prévisions
+  function chCartes() {
+    if (chDemain) {
+      chEl('carte-prev').innerHTML = '<div class="ct">les jours à venir</div><div class="cv">' + chEsc(chDemain.temp) +
+        '</div><div class="cs">demain · ' + chEsc(chDemain.libelle) + '</div>';
+    }
+    var c = chEl('carte-chauf');
+    if (chData && !chData.attente) {
+      c.className = 'carte chauf on';
+      c.innerHTML = '<div class="ct">chauffage</div><div class="cv">' + chEsc(chData.mesureTxt) + '</div><div class="cs">' +
+        (chData.chauffe ? '<i class="flamme"></i>' : '') + 'consigne ' + chEsc(chData.consigneTxt) + '</div>';
+    } else {
+      c.className = 'carte chauf' + (chActif ? ' on' : '');
+      c.innerHTML = '<div class="ct">chauffage</div><div class="cs">' + (chActif ? 'lecture en cours' : 'bientôt') + '</div>';
+    }
+  }
+  function chContenu(d) {
+    if (!d.hasOwnProperty('chauffage')) { return; }
+    chActif = d.chauffage !== null;
+    if (d.dehors) { chDehors = d.dehors; }
+    if (d.demain) { chDemain = d.demain; }
+    // pendant un réglage en cours, on ne laisse pas le poll écraser la valeur affichée
+    if (!chBusy && chPending === null) { chData = d.chauffage; }
+    chCartes();
+    if (vueActive === 'vue-chauffage' && !chBusy && chPending === null) { chRender(); }
+  }
+  function chPas(sens) {
+    if (!chData || chData.attente || chBusy || chBase(chData.mode) !== 'programme') { return false; }
+    var b = chData.bornes || { min: 15, max: 23, pas: 0.5 };
+    var depart = chPending !== null ? chPending : (typeof chData.consigne === 'number' ? chData.consigne : 19);
+    chPending = Math.min(b.max, Math.max(b.min, Math.round((depart + sens * b.pas) * 2) / 2));
+    chRender();
+    if (chTimer) { clearTimeout(chTimer); }
+    chTimer = setTimeout(chEnvoi, 1500);
+    return false;
+  }
+  function chEnvoi() {
+    chTimer = null;
+    if (chPending === null) { return; }
+    if (chData && chPending === chData.consigne) { chPending = null; chRender(); return; } // revenu au point de départ
+    chCommande('consigne?t=' + chPending);
+  }
+  function chMode(m) {
+    if (!chData || chData.attente || chBusy) { return false; }
+    if (chTimer) { clearTimeout(chTimer); chTimer = null; }
+    chPending = null;
+    // déjà dans ce mode ; sauf « programme » pendant un réglage à la main, qu'il annule
+    if (m === chBase(chData.mode) && !(m === 'programme' && (chData.mode === 'manual' || chData.mode === 'max'))) { chRender(); return false; }
+    chCommande(m);
+    return false;
+  }
+  function chCommande(chemin) {
+    chBusy = true;
+    chRender();
+    var x = new XMLHttpRequest();
+    x.open('GET', 'chauffage/' + chemin + (chemin.indexOf('?') < 0 ? '?' : '&') + '_=' + new Date().getTime(), true);
+    x.onreadystatechange = function () {
+      if (x.readyState !== 4) { return; }
+      var r = null;
+      try { r = JSON.parse(x.responseText); } catch (e) {}
+      chBusy = false;
+      chPending = null;
+      if (r && r.ok && r.chauffage) {
+        chData = r.chauffage;
+      } else {
+        chErreurJusqua = new Date().getTime() + 6000;
+        chEl('ch-etat').innerHTML = 'le thermostat n\'a pas répondu, réessaie dans un instant';
+        chEl('ch-etat').className = 'ch-etat erreur';
+        setTimeout(function () { if (vueActive === 'vue-chauffage') { chRender(); } }, 6100);
+      }
+      chRender();
+      chCartes();
+      setTimeout(pollContenu, 4500); // le serveur relit le vrai état 4 s après la commande
+    };
+    x.send();
+  }
+  function ouvrirChauffage() { montrer('vue-chauffage'); chRender(); return false; }
 
   // ---- minuteur de cuisine : double-toucher l'horloge de l'accueil ----
   // mnFin = échéance (ms) quand il tourne ; mnReste = ms restants quand il est en pause

@@ -117,6 +117,8 @@ cd /root/ecran-maison && git pull origin main && bash outils/netatmo.sh
 
 Netatmo invalide l'ancien jeton à chaque renouvellement : le jeton courant vit dans `netatmo-jeton.json` (gitignoré), jamais dans `config.json`. Ne pas supprimer ce fichier. Si la chaîne casse (`invalid_grant`), régénérer un jeton à l'étape 2 et relancer `outils/netatmo.sh`.
 
+Sur l'iPad, la température de la maison s'affiche sous la météo. Toucher la météo ouvre le menu « météo & maison », dont la carte chauffage mène à l'écran du thermostat.
+
 Le serveur interroge le thermostat toutes les 5 minutes et accepte quatre commandes depuis l'écran : consigne manuelle (bornée par `chauffage.consigneMin` et `consigneMax`, 15 et 23 par défaut, durée réglée dans l'app Netatmo), retour au programme, absent, hors-gel.
 
 ## 6 · chemin secret et lancement

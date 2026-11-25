@@ -18,7 +18,7 @@ const TZ = 'Europe/Paris';
 
 /* ---------- état en mémoire ---------- */
 const donnees = {
-  meteo: { html: 'météo indisponible', soleil: null, previsions: '' },
+  meteo: { html: 'météo indisponible', soleil: null, previsions: '', dehors: null, demain: null },
   agenda: {
     auj: '<div class="it">chargement</div>',
     venir: '<div class="it">chargement</div>',
@@ -228,6 +228,8 @@ async function majMeteo() {
   const coucher = enMinutes(j.daily.sunset && j.daily.sunset[0]);
   donnees.meteo.soleil = (lever != null && coucher != null) ? { lever: lever, coucher: coucher } : null;
 
+  donnees.meteo.dehors = { temp: t + '°', libelle: libelleMeteo(j.current.weather_code), minmax: 'mini ' + tmin + '° · maxi ' + tmax + '°' };
+  donnees.meteo.demain = { temp: tmax2 + '°', libelle: libelleMeteo(code2) };
   donnees.meteo.html = esc(libelleMeteo(j.current.weather_code)) + ' · <b>' + t + '°</b>' +
     '<span class="mdetail">' + tmin + '° / ' + tmax + '°</span>' +
     '<span class="mconseil">' + esc(conseil) + '</span>';
@@ -997,8 +999,9 @@ async function commandeChauffage(action, valeur) {
     attendu = { therm_setpoint_mode: 'manual', therm_setpoint_temperature: t, therm_setpoint_end_time: fin };
   } else if (action === 'programme') {
     // absent et hors-gel se lèvent au niveau de la maison ; un réglage manuel, au niveau de la pièce
+    // en quittant absent ou hors-gel, on lève aussi un éventuel réglage manuel resté sur la pièce
     if (modeActuel === 'away' || modeActuel === 'hg') await envoie('api/setthermmode', { mode: 'schedule' });
-    else await envoie('api/setroomthermpoint', { room_id: topo.piece.id, mode: 'home' });
+    await envoie('api/setroomthermpoint', { room_id: topo.piece.id, mode: 'home' });
     const p = topo.programme ? netatmo.programme(topo.programme, topo.piece.id, topo.tz, new Date()) : null;
     attendu = { therm_setpoint_mode: 'schedule', therm_setpoint_temperature: p ? p.actif.temp : null, therm_setpoint_end_time: 0 };
   } else if (action === 'absent') {
@@ -1172,9 +1175,20 @@ async function majMusique() {
 /* ============================================================
    assemblage de la page
    ============================================================ */
+// accueil : ligne « dedans » glissée dans le bloc météo, juste avant le conseil.
+// terracotta avec une petite flamme quand la chaudière chauffe, discrète sinon
+function meteoHtml() {
+  const c = donnees.chauffage, m = donnees.meteo.html;
+  if (!chauffageActif() || !c || c.mesure == null) return m;
+  const ligne = '<span class="mdedans' + (c.chauffe ? ' chauffe' : '') + '">dedans ' + esc(c.mesureTxt) +
+    (c.chauffe ? '<i class="flamme"></i>' : '') + '</span>';
+  const i = m.indexOf('<span class="mconseil">');
+  return i < 0 ? m + ligne : m.slice(0, i) + ligne + m.slice(i);
+}
+
 function page() {
   return TEMPLATE
-    .replace('{{METEO}}', donnees.meteo.html)
+    .replace('{{METEO}}', meteoHtml())
     .replace('{{AGENDA_AUJ}}', donnees.agenda.auj)
     .replace('{{AGENDA_VENIR}}', donnees.agenda.venir)
     .replace('{{SPORT_ITEMS}}', donnees.sport.html)
@@ -1226,7 +1240,9 @@ const serveur = http.createServer(async (req, res) => {
       dernierPoll = Date.now();
       // toutes les zones de la page, pour rafraîchir sans recharger
       json(res, {
-        meteo: donnees.meteo.html,
+        meteo: meteoHtml(),
+        dehors: donnees.meteo.dehors,
+        demain: donnees.meteo.demain,
         agendaAuj: donnees.agenda.auj,
         agendaVenir: donnees.agenda.venir,
         sport: donnees.sport.html,
@@ -1241,7 +1257,7 @@ const serveur = http.createServer(async (req, res) => {
         soleil: donnees.meteo.soleil,
         meteoPrevisions: donnees.meteo.previsions,
         moment: momentDuJour(),
-        chauffage: donnees.chauffage,
+        chauffage: chauffageActif() ? (donnees.chauffage || { attente: true }) : null,
       figees: sourcesFigees(),
       });
 
