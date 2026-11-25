@@ -62,6 +62,7 @@
     "clientSecret": "",
     "refreshToken": ""
   },
+  "chauffage": { "consigneMin": 15, "consigneMax": 23 },
 
   "spotify": {
     "clientId": "",

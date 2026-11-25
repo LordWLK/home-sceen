@@ -117,6 +117,8 @@ cd /root/ecran-maison && git pull origin main && bash outils/netatmo.sh
 
 Netatmo invalide l'ancien jeton à chaque renouvellement : le jeton courant vit dans `netatmo-jeton.json` (gitignoré), jamais dans `config.json`. Ne pas supprimer ce fichier. Si la chaîne casse (`invalid_grant`), régénérer un jeton à l'étape 2 et relancer `outils/netatmo.sh`.
 
+Le serveur interroge le thermostat toutes les 5 minutes et accepte quatre commandes depuis l'écran : consigne manuelle (bornée par `chauffage.consigneMin` et `consigneMax`, 15 et 23 par défaut, durée réglée dans l'app Netatmo), retour au programme, absent, hors-gel.
+
 ## 6 · chemin secret et lancement
 
 Personnaliser `basePath` dans `config.json` (garder un truc improbable). Puis :
@@ -154,3 +156,5 @@ Adapter `WorkingDirectory` et le chemin de node (`which node`) si besoin. Vérif
 - `GET {basePath}/musique/pause` : lecture / pause
 - `GET {basePath}/musique/suivant` : piste suivante
 - `GET {basePath}/musique/pochette` : pochette proxifiée (l'iPad la lit en HTTP chez nous)
+- `GET {basePath}/chauffage/consigne?t=20.5` : consigne manuelle, au demi-degré, bornée
+- `GET {basePath}/chauffage/programme`, `/absent`, `/horsgel` : modes du thermostat

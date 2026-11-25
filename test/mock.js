@@ -9,6 +9,8 @@
             PORT=8099 node test/mock.js
             MOCK_MUSIQUE=0 node test/mock.js  (rien ne joue : capsule masquée)
             MOCK_VERBOSE=1 node test/mock.js  (trace chaque requête simulée)
+            MOCK_NETATMO=0 node test/mock.js  (pas de thermostat configuré)
+            MOCK_NETATMO=panne node test/mock.js  (api netatmo injoignable)
 
    captures : NODE_PATH=$(npm root -g) node test/capture.js   (voir capture.js) */
 'use strict';
@@ -23,6 +25,7 @@ const PORT = parseInt(process.env.PORT || '8017', 10);
 const BASE = '/maison-mock';
 const VERBOSE = process.env.MOCK_VERBOSE === '1';
 const MUSIQUE = process.env.MOCK_MUSIQUE !== '0';
+const NETATMO = process.env.MOCK_NETATMO || '1'; // '1' simulé · '0' non configuré · 'panne' injoignable
 
 /* ---------- dates ---------- */
 const pad = n => (n < 10 ? '0' : '') + n;
@@ -225,11 +228,74 @@ function enCours() {
   };
 }
 
+/* ---------- netatmo (thermostat), calqué sur le vrai calibrage ----------
+   une maison, la salle à manger, relais NAPlug + thermostat NATherm1, programme
+   « Mon planning de chauffe » : nuit 17° jusqu'à 8 h, confort 20° jusqu'à 23 h, tous les jours.
+   jetons tournants comme le vrai : seul le dernier refresh token émis est accepté. */
+const NT = { valide: 'mock-refresh-0', n: 0, acces: '', modeMaison: 'schedule', manuel: null, mesure: 19.4 };
+const NT_HOME = 'mock-home', NT_ROOM = 'mock-room', NT_THERM = '70:ee:50:00:00:01', NT_PLUG = '70:ee:50:00:00:02';
+const ntZone = (id, type, name, t) => ({ id: id, type: type, name: name, rooms: [{ id: NT_ROOM, therm_setpoint_temperature: t }] });
+const NT_TIMETABLE = [{ zone_id: 1, m_offset: 0 }];
+for (let j = 0; j < 7; j++) NT_TIMETABLE.push({ zone_id: 0, m_offset: j * 1440 + 480 }, { zone_id: 1, m_offset: j * 1440 + 1380 });
+function ntHomesdata() {
+  return { status: 'ok', body: { homes: [{
+    id: NT_HOME, name: 'Mon domicile', timezone: 'Europe/Paris', therm_mode: NT.modeMaison,
+    therm_setpoint_default_duration: 180, temperature_control_mode: 'heating',
+    rooms: [{ id: NT_ROOM, name: 'Salle à manger', type: 'dining_room', module_ids: [NT_THERM] }],
+    modules: [
+      { id: NT_PLUG, type: 'NAPlug', name: 'Netatmo Relay', modules_bridged: [NT_THERM] },
+      { id: NT_THERM, type: 'NATherm1', name: 'Netatmo Smart Thermostat', room_id: NT_ROOM, bridge: NT_PLUG },
+    ],
+    schedules: [{
+      id: 'mock-planning', name: 'Mon planning de chauffe', type: 'therm', selected: true, hg_temp: 7, away_temp: 12,
+      zones: [ntZone(0, 0, 'Comfort', 20), ntZone(1, 1, 'Night', 17), ntZone(3, 8, 'Comfort+', 18), ntZone(4, 5, 'Eco', 16)],
+      timetable: NT_TIMETABLE,
+    }],
+  }], user: { email: 'personne@exemple.fr', id: 'mock-user' } } };
+}
+function ntHomestatus() {
+  const h = new Date().getHours(), maintenant = Math.floor(Date.now() / 1000);
+  let mode = 'schedule', temp = h >= 8 && h < 23 ? 20 : 17, fin = 0;
+  if (NT.modeMaison === 'away') { mode = 'away'; temp = 12; }
+  else if (NT.modeMaison === 'hg') { mode = 'hg'; temp = 7; }
+  else if (NT.manuel && NT.manuel.fin > maintenant) { mode = 'manual'; temp = NT.manuel.temp; fin = NT.manuel.fin; }
+  return { status: 'ok', body: { home: { id: NT_HOME,
+    rooms: [{ id: NT_ROOM, reachable: true, therm_measured_temperature: NT.mesure, therm_setpoint_temperature: temp,
+      therm_setpoint_mode: mode, therm_setpoint_end_time: fin, anticipating: false, open_window: false }],
+    modules: [
+      { id: NT_PLUG, type: 'NAPlug', firmware_revision: 200, rf_strength: 80, wifi_strength: 50 },
+      { id: NT_THERM, type: 'NATherm1', reachable: true, battery_state: 'full', boiler_status: NT.mesure < temp - 0.1, anticipating: false, bridge: NT_PLUG },
+    ] } } };
+}
+function netatmoFaux(chemin, opt) {
+  if (NETATMO === 'panne') throw new TypeError('fetch failed (netatmo simulé en panne)');
+  const p = new URLSearchParams(String((opt && opt.body) || ''));
+  if (chemin === 'oauth2/token') {
+    if (p.get('refresh_token') !== NT.valide) return json400({ error: 'invalid_grant' });
+    NT.n++; NT.valide = 'mock-refresh-' + NT.n; NT.acces = 'mock-acces-' + NT.n;
+    return json({ access_token: NT.acces, refresh_token: NT.valide, expires_in: 10800 });
+  }
+  const auth = String((opt && opt.headers && opt.headers.Authorization) || '');
+  if (auth !== 'Bearer ' + NT.acces) return new Response(JSON.stringify({ error: { code: 3, message: 'Access token expired' } }), { status: 403 });
+  const ok = () => json({ status: 'ok', time_server: Math.floor(Date.now() / 1000) });
+  if (chemin === 'api/homesdata') return json(ntHomesdata());
+  if (chemin === 'api/homestatus') return json(ntHomestatus());
+  if (chemin === 'api/setroomthermpoint') {
+    if (p.get('mode') === 'manual') NT.manuel = { temp: parseFloat(p.get('temp')), fin: parseInt(p.get('endtime'), 10) };
+    else if (p.get('mode') === 'home') NT.manuel = null;
+    return ok();
+  }
+  if (chemin === 'api/setthermmode') { NT.modeMaison = p.get('mode'); return ok(); }
+  return new Response(JSON.stringify({ error: { code: 404, message: 'inconnu' } }), { status: 404 });
+}
+
 /* ---------- faux fetch ---------- */
 const json = o => new Response(JSON.stringify(o), { status: 200, headers: { 'content-type': 'application/json' } });
 const html = s => new Response(s, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
 const vide = code => new Response(null, { status: code });
+const json400 = o => new Response(JSON.stringify(o), { status: 400, headers: { 'content-type': 'application/json' } });
 const ROUTES = [
+  [/api\.netatmo\.com\/(oauth2\/token|api\/\w+)/, (m, opt) => netatmoFaux(m[1], opt)],
   [/api\.open-meteo\.com/, () => json(meteo())],
   [/football-data\.org\/v4\/teams\/(\d+)\/matches/, m => json(foot(+m[1]))],
   [/espn\.com\/.*\/basketball\/nba\/teams\/(\w+)\/schedule/, m => json(nba(m[1]))],
@@ -244,11 +310,11 @@ const ROUTES = [
   [/api\.spotify\.com\/v1\/me\/player$/, () => json({ device: { volume_percent: 40 } })],
   [/i\.scdn\.co\//, () => new Response(POCHETTE, { status: 200, headers: { 'content-type': 'image/png' } })],
 ];
-global.fetch = async function (url) {
+global.fetch = async function (url, opt) {
   const u = String(url);
   for (const [re, fn] of ROUTES) {
     const m = u.match(re);
-    if (m) { if (VERBOSE) console.log('[mock] ' + u); return fn(m); }
+    if (m) { if (VERBOSE) console.log('[mock] ' + u); return fn(m, opt); }
   }
   if (VERBOSE) console.log('[mock] 404 ' + u);
   return vide(404);
@@ -268,9 +334,12 @@ Object.assign(CFG, {
   footballDataKey: 'mock', abonnesManuel: 13100, statsUrl: '', alerteUrl: '',
   moments: [{ jour: '12-23', texte: 'joyeux anniversaire inès' }, { jour: '08-22', texte: 'joyeux anniversaire antoine' }],
   spotify: { clientId: 'mock', clientSecret: 'mock', refreshToken: 'mock' },
+  netatmo: NETATMO === '0' ? undefined : { clientId: 'mock', clientSecret: 'mock', refreshToken: 'mock-refresh-0' },
 });
 const TMP = path.join(__dirname, 'tmp');
 fs.mkdirSync(TMP, { recursive: true });
+// le faux netatmo repart de son premier jeton à chaque lancement : on efface la chaîne précédente
+try { fs.unlinkSync(path.join(TMP, 'netatmo-jeton.json')); } catch (e) { /* pas de chaîne précédente */ }
 const cfgPath = path.join(TMP, 'config.json');
 fs.writeFileSync(cfgPath, JSON.stringify(CFG, null, 2) + '\n');
 process.env.ECRAN_CONFIG = cfgPath;

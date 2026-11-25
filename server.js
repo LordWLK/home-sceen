@@ -8,6 +8,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const ical = require('node-ical');
+const netatmo = require('./netatmo'); // client minimal de l'api netatmo (thermostat), sans dépendance
 
 // chemin du config : ECRAN_CONFIG (harnais de test) sinon config.json à côté du serveur
 const CONFIG_PATH = process.env.ECRAN_CONFIG || path.join(__dirname, 'config.json');
@@ -26,6 +27,7 @@ const donnees = {
   sport: { html: '', detail: '' },
   studio: { html: '' },
   cinema: { html: '', detailJours: [], joursLabel: [] },
+  chauffage: null, // rempli par majChauffage si config.netatmo est renseigné
   menage: { compact: '', planning: '' },
 };
 const musique = {
@@ -37,16 +39,18 @@ let spotifyAccess = { token: '', exp: 0 };
 /* ---------- santé des sources : horodatage de la dernière réussite ----------
    permet de repérer une source figée (scraper cassé, api muette) sans lire
    les logs. seuils larges = 8× l'intervalle de rafraîchissement. */
-const sante = { meteo: 0, agenda: 0, sport: 0, cinema: 0, studio: 0 };
+const sante = { meteo: 0, agenda: 0, sport: 0, cinema: 0, studio: 0, chauffage: 0 };
 const SEUILS = { // ms au-delà desquels une source est considérée figée
   meteo: 16 * 60000, agenda: 16 * 60000, sport: 16 * 60000,
   cinema: 14 * 3600000, studio: 14 * 3600000,
+  chauffage: 16 * 60000, // interrogé toutes les 5 min
 };
-const NOMS_FR = { meteo: 'météo', agenda: 'agenda', sport: 'sport', cinema: 'ciné', studio: 'studio' };
+const NOMS_FR = { meteo: 'météo', agenda: 'agenda', sport: 'sport', cinema: 'ciné', studio: 'studio', chauffage: 'chauffage' };
 function sourcesFigees() {
   const maintenant = Date.now();
   return Object.keys(sante)
     .filter(k => maintenant - sante[k] > SEUILS[k])
+    .filter(k => k !== 'chauffage' || chauffageActif()) // pas de thermostat configuré : rien à signaler
     .map(k => NOMS_FR[k]);
 }
 
@@ -865,6 +869,155 @@ async function majCinema() {
 }
 
 /* ============================================================
+   chauffage · thermostat netatmo (api energy)
+   jeton tournant partagé avec debug-netatmo.js via netatmo-jeton.json
+   (voir netatmo.js). homestatus toutes les 5 min, homesdata (pièces,
+   programme) toutes les heures. les commandes sont bornées et
+   espacées d'au moins 1 s ; l'écran cumule les appuis −/+ avant d'envoyer.
+   ============================================================ */
+const JETON_NETATMO = netatmo.cheminJeton(CONFIG_PATH);
+const chauffageActif = () => !!(CFG.netatmo && CFG.netatmo.clientId && CFG.netatmo.clientSecret && CFG.netatmo.refreshToken);
+const BORNES_CONSIGNE = {
+  min: Number(CFG.chauffage && CFG.chauffage.consigneMin) || 15,
+  max: Number(CFG.chauffage && CFG.chauffage.consigneMax) || 23,
+  pas: 0.5,
+};
+const journalNetatmo = m => console.log('[netatmo]', m);
+const degres = n => (n == null ? '—' : String(Math.round(n * 10) / 10).replace('.', ',') + '°');
+const hmLocal = min => Math.floor(min / 60) + ' h' + (min % 60 ? ' ' + String(min % 60).padStart(2, '0') : '');
+const JOURS_PROG = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim']; // la semaine netatmo commence lundi
+// heure d'une fin de réglage (secondes unix) : "15 h 30", "demain 8 h", "sam 9 h"
+function heureChauffage(ts) {
+  const d = new Date(ts * 1000), p = parisParts(d);
+  const h = (parseInt(p.hour, 10) % 24) + ' h' + (p.minute !== '00' ? ' ' + p.minute : '');
+  if (jourCle(d) === jourCle(new Date())) return h;
+  if (jourCle(d) === jourCle(new Date(Date.now() + 86400000))) return 'demain ' + h;
+  return p.weekday.replace('.', '') + ' ' + h;
+}
+function libelleCreneau(c) {
+  if (c.debut === 0 && c.fin === 1440) return 'toute la journée';
+  if (c.debut === 0) return "jusqu'à " + hmLocal(c.fin);
+  if (c.fin === 1440) return 'dès ' + hmLocal(c.debut);
+  return hmLocal(c.debut) + ' à ' + hmLocal(c.fin);
+}
+
+let chTopo = null;   // maison, pièce principale, programme (homesdata)
+let chBrut = null;   // dernier état brut de la pièce et du thermostat (homestatus)
+async function topoChauffage(forcer) {
+  if (chTopo && !forcer && Date.now() - chTopo.lu < 3600000) return chTopo;
+  const { corps } = await netatmo.appel(CFG.netatmo, JETON_NETATMO, 'api/homesdata', null, null, journalNetatmo);
+  const maisons = (corps.homes || []).filter(h => (h.modules || []).some(m => netatmo.THERMIQUES.test(m.type)));
+  if (!maisons.length) throw new Error('aucune maison avec un thermostat sur ce compte');
+  const h = maisons[0];
+  const mods = h.modules || [];
+  const pilote = mods.find(m => netatmo.PILOTES.test(m.type)); // le thermostat qui commande la chaudière
+  const pieces = (h.rooms || []).filter(r => (r.module_ids || []).some(id => mods.some(m => m.id === id && netatmo.THERMIQUES.test(m.type))));
+  const principale = (pilote && pieces.find(r => r.id === pilote.room_id)) || pieces[0];
+  if (!principale) throw new Error('aucune pièce chauffée');
+  const progs = (h.schedules || []).filter(x => !x.type || x.type === 'therm');
+  chTopo = {
+    lu: Date.now(), homeId: h.id, tz: h.timezone || TZ,
+    piece: { id: principale.id, nom: principale.name },
+    piloteId: pilote ? pilote.id : null,
+    duree: h.therm_setpoint_default_duration || 180, // minutes d'un réglage manuel, comme dans l'app netatmo
+    programme: progs.find(x => x.selected) || progs[0] || null,
+  };
+  return chTopo;
+}
+
+// état affichable, à partir de l'état brut de la pièce (homestatus) et du programme
+function etatChauffage(topo, room, mod) {
+  const prog = topo.programme ? netatmo.programme(topo.programme, topo.piece.id, topo.tz, new Date()) : null;
+  const mode = room.therm_setpoint_mode || 'schedule';
+  const consigne = room.therm_setpoint_temperature;
+  const fin = room.therm_setpoint_end_time || 0;
+  const jusqua = fin ? " jusqu'à " + heureChauffage(fin) : '';
+  let etat;
+  if (mode === 'manual') etat = 'réglé à la main · ' + degres(consigne) + jusqua + ', puis retour au programme';
+  else if (mode === 'away') etat = 'mode absent · ' + degres(consigne) + jusqua;
+  else if (mode === 'hg') etat = 'hors-gel · ' + degres(consigne) + jusqua;
+  else if (mode === 'max') etat = 'chauffe à fond' + jusqua;
+  else if (mode === 'off') etat = 'chauffage coupé';
+  else if (prog && prog.suivant) {
+    const quand = (prog.suivant.jours === 0 ? '' : prog.suivant.jours === 1 ? 'demain ' :
+      JOURS_PROG[(prog.jourSemaine + prog.suivant.jours) % 7] + ' ') + hmLocal(prog.suivant.min);
+    etat = 'au programme · ' + prog.actif.nom + " jusqu'à " + quand + ', puis ' + prog.suivant.nom + ' à ' + degres(prog.suivant.temp);
+  } else etat = 'au programme' + (prog ? ' · ' + prog.actif.nom + ' à ' + degres(prog.actif.temp) : '');
+  const chauffe = !!mod.boiler_status, anticipe = !!(room.anticipating || mod.anticipating), fenetre = !!room.open_window;
+  const joignable = room.reachable !== false && mod.reachable !== false;
+  const statut = !joignable ? 'thermostat injoignable'
+    : fenetre ? 'fenêtre ouverte, chauffe suspendue'
+    : anticipe && prog && prog.suivant ? 'préchauffe pour ' + hmLocal(prog.suivant.min)
+    : chauffe ? 'chauffe en cours' : 'chaudière au repos';
+  const sch = topo.programme || {};
+  return {
+    piece: topo.piece.nom,
+    mesure: room.therm_measured_temperature, mesureTxt: degres(room.therm_measured_temperature),
+    consigne: consigne, consigneTxt: degres(consigne),
+    mode: mode, fin: fin, etat: etat, statut: statut,
+    chauffe: chauffe, anticipe: anticipe, fenetre: fenetre, joignable: joignable,
+    programme: prog ? prog.jour.map(c => ({ nom: c.nom, temp: degres(c.temp), quand: libelleCreneau(c), etat: c.etat })) : [],
+    horsGel: sch.hg_temp, absent: sch.away_temp,
+    bornes: BORNES_CONSIGNE,
+    maj: Date.now(),
+  };
+}
+
+async function majChauffage(forcerTopo) {
+  if (!chauffageActif()) return;
+  const topo = await topoChauffage(forcerTopo);
+  const { corps } = await netatmo.appel(CFG.netatmo, JETON_NETATMO, 'api/homestatus', { home_id: topo.homeId }, null, journalNetatmo);
+  const sh = corps.home || {};
+  const room = (sh.rooms || []).find(r => r.id === topo.piece.id);
+  if (!room) throw new Error('pièce ' + topo.piece.nom + ' absente de homestatus');
+  const mod = (sh.modules || []).find(m => m.id === topo.piloteId) || {};
+  chBrut = { room: room, mod: mod };
+  donnees.chauffage = etatChauffage(topo, room, mod);
+  sante.chauffage = Date.now();
+}
+const echecChauffage = e => console.log('[maj] chauffage en échec :', String(e.message).replace(/\n/g, ' '));
+
+// commandes depuis l'écran. netatmo applique en quelques secondes : on affiche tout de
+// suite l'état attendu (optimiste), puis on relit l'état réel.
+let chDerniereCommande = 0;
+async function commandeChauffage(action, valeur) {
+  if (!chauffageActif()) throw new Error('chauffage non configuré');
+  if (Date.now() - chDerniereCommande < 1000) throw new Error('commande trop rapprochée');
+  chDerniereCommande = Date.now();
+  const topo = await topoChauffage(false);
+  const sch = topo.programme || {};
+  const envoie = (chemin, params) => netatmo.appel(CFG.netatmo, JETON_NETATMO, chemin, Object.assign({ home_id: topo.homeId }, params), null, journalNetatmo);
+  const modeActuel = chBrut ? chBrut.room.therm_setpoint_mode : 'schedule';
+  let attendu;
+  if (action === 'consigne') {
+    if (!isFinite(valeur)) throw new Error('consigne invalide');
+    const t = Math.min(BORNES_CONSIGNE.max, Math.max(BORNES_CONSIGNE.min, Math.round(valeur * 2) / 2));
+    const fin = Math.floor(Date.now() / 1000) + topo.duree * 60;
+    await envoie('api/setroomthermpoint', { room_id: topo.piece.id, mode: 'manual', temp: t, endtime: fin });
+    attendu = { therm_setpoint_mode: 'manual', therm_setpoint_temperature: t, therm_setpoint_end_time: fin };
+  } else if (action === 'programme') {
+    // absent et hors-gel se lèvent au niveau de la maison ; un réglage manuel, au niveau de la pièce
+    if (modeActuel === 'away' || modeActuel === 'hg') await envoie('api/setthermmode', { mode: 'schedule' });
+    else await envoie('api/setroomthermpoint', { room_id: topo.piece.id, mode: 'home' });
+    const p = topo.programme ? netatmo.programme(topo.programme, topo.piece.id, topo.tz, new Date()) : null;
+    attendu = { therm_setpoint_mode: 'schedule', therm_setpoint_temperature: p ? p.actif.temp : null, therm_setpoint_end_time: 0 };
+  } else if (action === 'absent') {
+    await envoie('api/setthermmode', { mode: 'away' });
+    attendu = { therm_setpoint_mode: 'away', therm_setpoint_temperature: sch.away_temp, therm_setpoint_end_time: 0 };
+  } else if (action === 'horsgel') {
+    await envoie('api/setthermmode', { mode: 'hg' });
+    attendu = { therm_setpoint_mode: 'hg', therm_setpoint_temperature: sch.hg_temp, therm_setpoint_end_time: 0 };
+  } else throw new Error('commande inconnue');
+  if (chBrut) {
+    chBrut = { room: Object.assign({}, chBrut.room, attendu), mod: chBrut.mod };
+    donnees.chauffage = etatChauffage(topo, chBrut.room, chBrut.mod);
+  }
+  setTimeout(() => majChauffage().catch(echecChauffage), 4000);
+  setTimeout(() => majChauffage().catch(echecChauffage), 30000); // la chaudière réagit plus lentement
+  return donnees.chauffage;
+}
+
+/* ============================================================
    ménage · roulement fixe (config.menage), une personne par jour,
    week-end à deux ; le serveur calcule où on en est dans le cycle
    ============================================================ */
@@ -1088,8 +1241,20 @@ const serveur = http.createServer(async (req, res) => {
         soleil: donnees.meteo.soleil,
         meteoPrevisions: donnees.meteo.previsions,
         moment: momentDuJour(),
-        figees: sourcesFigees(),
+        chauffage: donnees.chauffage,
+      figees: sourcesFigees(),
       });
+
+    } else if (/^\/chauffage\/(consigne|programme|absent|horsgel)$/.test(route)) {
+      // commandes du thermostat ; consigne : ?t=20.5 (degrés, pas de 0,5, bornée)
+      const m = req.url.match(/[?&]t=(-?\d+(?:\.\d+)?)/);
+      try {
+        const d = await commandeChauffage(route.slice('/chauffage/'.length), m ? parseFloat(m[1]) : NaN);
+        json(res, { ok: true, chauffage: d });
+      } catch (e) {
+        console.log('[chauffage]', route.slice(1), 'refusé :', String(e.message).replace(/\n/g, ' '));
+        json(res, { ok: false, erreur: e.message });
+      }
 
     } else if (route === '/agenda/epingle') {
       // bascule l'épinglage d'un événement perso (clé passée encodée par la vue semaine)
@@ -1166,12 +1331,14 @@ Object.keys(sante).forEach(k => { sante[k] = Date.now(); });
 rafraichirTout();
 majMusique();
 rafraichirLent();
+majChauffage().catch(echecChauffage);
 setInterval(rafraichirTout, 2 * 60 * 1000);   // données : toutes les 2 min
 // spotify : 5 s. ne pas descendre : à 2 s l'api punit par des pauses
 // forcées de 90 min et plus (vécu), la capsule devient moins réactive, pas plus
 setInterval(majMusique, 5 * 1000);
 setInterval(rafraichirLent, 6 * 3600 * 1000); // ciné + stats : toutes les 6 h
 setInterval(verifieEcran, 5 * 60 * 1000);     // watchdog : l'ipad donne-t-il signe de vie ?
+setInterval(() => majChauffage().catch(echecChauffage), 5 * 60 * 1000); // thermostat : 5 min (quota netatmo)
 
 serveur.listen(CFG.port, () => {
   console.log('écran maison prêt : http://<ip-du-vps>:' + CFG.port + CFG.basePath + '/');

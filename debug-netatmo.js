@@ -14,94 +14,20 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const netatmo = require('./netatmo');
 
 const CONFIG_PATH = process.env.ECRAN_CONFIG || path.join(__dirname, 'config.json');
-const JETON_PATH = path.join(path.dirname(CONFIG_PATH), 'netatmo-jeton.json');
-const API = 'https://api.netatmo.com/';
+const JETON_PATH = netatmo.cheminJeton(CONFIG_PATH);
 const TZ = 'Europe/Paris';
 
 function sortie(msg) { console.log(msg); process.exit(1); }
 
-/* ---------- jeton tournant ---------- */
-function lireJeton() {
-  try { return JSON.parse(fs.readFileSync(JETON_PATH, 'utf8')); } catch (e) { return {}; }
-}
-function ecrireJeton(j) {
-  // écriture atomique : un fichier à moitié écrit ferait perdre la chaîne de jetons
-  const tmp = JETON_PATH + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(j, null, 2) + '\n', { mode: 0o600 });
-  fs.renameSync(tmp, JETON_PATH);
-}
-function duree(ms) {
-  const m = Math.max(0, Math.round(ms / 60000));
-  return m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') : m + ' min';
-}
-async function jetonAcces(cfg, forcer) {
-  let j = lireJeton();
-  // un refreshToken différent dans config.json = jeton fraîchement régénéré : on repart de lui
-  if (j.depuis !== cfg.refreshToken) j = { depuis: cfg.refreshToken, refresh: cfg.refreshToken };
-  if (!forcer && j.acces && Date.now() < j.expire - 120000) {
-    return { jeton: j.acces, etat: 'réutilisé, valide encore ' + duree(j.expire - Date.now()) };
-  }
-  let r, t;
-  try {
-    r = await fetch(API + 'oauth2/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token', refresh_token: j.refresh,
-        client_id: cfg.clientId, client_secret: cfg.clientSecret,
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-    t = await r.json().catch(() => ({}));
-  } catch (e) { sortie('netatmo injoignable (' + e.message + ')'); }
-  if (!t.access_token) {
-    const code = String(t.error || r.status);
-    if (code === 'invalid_grant') {
-      sortie('netatmo refuse le jeton de renouvellement : il a expiré ou a déjà servi.\n' +
-        'régénère-en un sur dev.netatmo.com (token generator, cases read_thermostat et\n' +
-        'write_thermostat), puis relance la commande de configuration.');
-    }
-    if (code === 'invalid_client') sortie('identifiant ou secret de l\'application netatmo incorrect (clientId / clientSecret).');
-    sortie('renouvellement du jeton refusé : ' + code);
-  }
-  j.acces = t.access_token;
-  j.refresh = t.refresh_token || j.refresh;
-  j.expire = Date.now() + (t.expires_in || 10800) * 1000;
-  j.maj = new Date().toISOString();
-  try { ecrireJeton(j); } catch (e) {
-    sortie('jeton renouvelé mais impossible de l\'enregistrer (' + e.message + ').\n' +
-      'l\'ancien est désormais invalide : il faudra en régénérer un.');
-  }
-  return { jeton: j.acces, etat: 'renouvelé, enregistré dans ' + path.basename(JETON_PATH) };
-}
-
-/* ---------- api ---------- */
+/* ---------- api : jeton tournant et appels via netatmo.js ---------- */
 async function api(cfg, acces, chemin, params) {
-  for (let essai = 0; essai < 2; essai++) {
-    let r, j;
-    try {
-      r = await fetch(API + chemin, {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + acces.jeton, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(params || {}),
-        signal: AbortSignal.timeout(15000),
-      });
-      j = await r.json().catch(() => ({}));
-    } catch (e) { sortie(chemin + ' : netatmo injoignable (' + e.message + ')'); }
-    if (r.ok && j.body) return j.body;
-    const code = j.error && j.error.code;
-    // 2 = jeton invalide, 3 = jeton expiré : on renouvelle une fois et on réessaie
-    if ((code === 2 || code === 3) && essai === 0) {
-      Object.assign(acces, await jetonAcces(cfg, true));
-      console.log('jeton d\'accès refusé par netatmo (code ' + code + '), ' + acces.etat);
-      continue;
-    }
-    if (code === 13) sortie(chemin + ' : jeton sans les droits thermostat. régénère-le en cochant read_thermostat et write_thermostat.');
-    if (code === 26 || r.status === 429) sortie(chemin + ' : limite d\'appels netatmo atteinte, réessaie dans une heure.');
-    sortie(chemin + ' : erreur ' + r.status + ' ' + JSON.stringify(j.error || j).slice(0, 200));
-  }
+  try {
+    const r = await netatmo.appel(cfg, JETON_PATH, chemin, params, acces, console.log);
+    return r.corps;
+  } catch (e) { sortie(e.message); }
 }
 
 /* ---------- mise en forme ---------- */
@@ -114,24 +40,8 @@ function quand(ts) {
     .formatToParts(new Date(ts * 1000)).forEach(x => { p[x.type] = x.value; });
   return p.weekday.replace('.', '') + ' ' + p.day + ' · ' + hm(+p.hour * 60 + +p.minute);
 }
-const TYPES_ZONE = { 0: 'confort', 1: 'nuit', 5: 'éco', 8: 'confort +' };
-const nomZone = z => TYPES_ZONE[z.type] || String(z.name || 'zone ' + z.id).toLowerCase();
-function tempZone(z, roomId) {
-  const r = (z.rooms || []).find(x => x.id === roomId);
-  if (r && r.therm_setpoint_temperature != null) return r.therm_setpoint_temperature;
-  const rt = (z.rooms_temp || []).find(x => x.room_id === roomId);
-  return rt ? (rt.temp != null ? rt.temp : rt.therm_setpoint_fp) : null;
-}
-// lundi = 0 … dimanche = 6, minutes depuis minuit, en heure de paris
-function maintenantSemaine(tz) {
-  const p = {};
-  new Intl.DateTimeFormat('en-GB', { timeZone: tz || TZ, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
-    .formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
-  const jour = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(p.weekday);
-  return { jour: jour, min: (+p.hour % 24) * 60 + +p.minute };
-}
+const { nomZone, tempZone, THERMIQUES } = netatmo;
 const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
-const THERMIQUES = /^(NATherm1|NAPlug|NRV|OTH|OTM|BNS)$/;
 const NOMS_MODULE = { NATherm1: 'thermostat', NAPlug: 'relais', NRV: 'vanne', OTH: 'relais opentherm', OTM: 'thermostat opentherm', BNS: 'smarther' };
 
 /* ---------- programme ---------- */
@@ -145,18 +55,10 @@ function resumeProgramme(sch, rooms, tz) {
     console.log('  zone ' + z.id + ' · ' + nomZone(z) + ' (type ' + z.type + ', « ' + (z.name || '') + ' ») · ' + t);
   });
   console.log('  hors-gel ' + fr(sch.hg_temp) + ' · absent ' + fr(sch.away_temp));
-  const tt = (sch.timetable || []).slice().sort((a, b) => a.m_offset - b.m_offset);
-  if (!tt.length) return;
-  const now = maintenantSemaine(tz);
-  const debut = now.jour * 1440, ici = debut + now.min;
-  // zone active à minuit : dernier créneau avant le début du jour (sinon le dernier de la semaine)
-  const avant = tt.filter(c => c.m_offset <= debut);
-  const minuit = avant.length ? avant[avant.length - 1] : tt[tt.length - 1];
-  const duJour = [{ zone_id: minuit.zone_id, m_offset: debut }].concat(tt.filter(c => c.m_offset > debut && c.m_offset < debut + 1440));
-  const actifs = tt.filter(c => c.m_offset <= ici);
-  const actif = actifs.length ? actifs[actifs.length - 1] : tt[tt.length - 1];
-  console.log('  aujourd\'hui (' + JOURS[now.jour] + ') : ' + duJour.map(c => hm(c.m_offset - debut) + ' ' + nomZone(zones[c.zone_id] || {})).join(' · '));
-  console.log('  maintenant : ' + nomZone(zones[actif.zone_id] || {}));
+  const p = netatmo.programme(sch, rooms.length ? rooms[0].id : null, tz, new Date());
+  if (!p) return;
+  console.log('  aujourd\'hui (' + JOURS[p.jourSemaine] + ') : ' + p.jour.map(c => hm(c.debut) + ' ' + c.nom).join(' · '));
+  console.log('  maintenant : ' + p.actif.nom + (p.suivant ? ' · puis ' + p.suivant.nom + ' ' + (p.suivant.jours === 0 ? '' : p.suivant.jours === 1 ? 'demain ' : 'dans ' + p.suivant.jours + ' jours ') + 'à ' + hm(p.suivant.min) : ''));
 }
 
 (async () => {
@@ -168,7 +70,8 @@ function resumeProgramme(sch, rooms, tz) {
   }
 
   console.log('== jeton');
-  const acces = await jetonAcces(cfg, false);
+  let acces;
+  try { acces = await netatmo.jetonAcces(cfg, JETON_PATH, false); } catch (e) { sortie(e.message); }
   console.log(acces.etat);
 
   const data = await api(cfg, acces, 'api/homesdata');
