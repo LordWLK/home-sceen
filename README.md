@@ -117,9 +117,17 @@ cd /root/ecran-maison && git pull origin main && bash outils/netatmo.sh
 
 Netatmo invalide l'ancien jeton à chaque renouvellement : le jeton courant vit dans `netatmo-jeton.json` (gitignoré), jamais dans `config.json`. Ne pas supprimer ce fichier. Si la chaîne casse (`invalid_grant`), régénérer un jeton à l'étape 2 et relancer `outils/netatmo.sh`.
 
-Sur l'iPad, la température de la maison s'affiche sous la météo. Toucher la météo ouvre le menu « météo & maison », dont la carte chauffage mène à l'écran du thermostat.
+Sur l'iPad, la température de la maison s'affiche sous la météo. Toucher la météo ouvre le menu « météo & maison », dont la carte chauffage mène à l'écran des pièces : une petite arche par pièce équipée (thermostat ou vannes), qui passe en terracotta quand la pièce chauffe. Toucher une pièce ouvre son détail (dehors, la pièce avec sa consigne −/+, son programme du jour). Le lien « programme » en haut à droite ouvre le programme maison.
 
-Le serveur interroge le thermostat toutes les 5 minutes et accepte quatre commandes depuis l'écran : consigne manuelle (bornée par `chauffage.consigneMin` et `consigneMax`, 15 et 23 par défaut, durée réglée dans l'app Netatmo), retour au programme, absent, hors-gel.
+Le serveur interroge Netatmo toutes les 5 minutes et accepte depuis l'écran : consigne manuelle d'une pièce (bornée par `chauffage.consigneMin` et `consigneMax`, 15 et 23 par défaut, élargie jusqu'au plus chaud du programme de la pièce ; durée réglée dans l'app Netatmo), retour au programme (une pièce ou toute la maison), absent, hors-gel.
+
+### programme maison
+
+Un planning pièce par pièce est préparamétré dans `programme.js` (réveil 8 h en semaine, 9 h 30 le week-end, chauffe une heure avant ; chambre, bureaux, salle de bain, pièce de vie). Les pièces Netatmo sont reconnues par leur nom. Rien ne part chez Netatmo avant d'appuyer sur « appliquer ce programme » sur l'écran programme : le serveur crée alors le planning « Programme maison » et l'active. L'ancien planning n'est pas touché, un lien permet d'y revenir.
+
+Ensuite, toucher une plage d'une barre permet de changer sa température (−/+), et les boutons −/+ du réveil décalent tous les débuts de matinée d'un quart d'heure. Une retouche part tout de suite chez Netatmo. Elle est gardée dans `programme-maison.json` (gitignoré) ; supprimer ce fichier ou toucher « reprendre le programme d'origine » revient au programme de `programme.js`.
+
+Pour voir à blanc, avant d'appliquer, dans quelle ligne tombe chaque pièce : `node debug-netatmo.js` (fin de la sortie). Pour que les vannes allument la chaudière quand le thermostat est déjà à température, activer la priorité au confort thermique dans l'appli Netatmo.
 
 ## 6 · chemin secret et lancement
 
@@ -158,5 +166,6 @@ Adapter `WorkingDirectory` et le chemin de node (`which node`) si besoin. Vérif
 - `GET {basePath}/musique/pause` : lecture / pause
 - `GET {basePath}/musique/suivant` : piste suivante
 - `GET {basePath}/musique/pochette` : pochette proxifiée (l'iPad la lit en HTTP chez nous)
-- `GET {basePath}/chauffage/consigne?t=20.5` : consigne manuelle, au demi-degré, bornée
-- `GET {basePath}/chauffage/programme`, `/absent`, `/horsgel` : modes du thermostat
+- `GET {basePath}/chauffage/consigne?t=20.5&piece=<id>` : consigne manuelle d'une pièce, au demi-degré, bornée
+- `GET {basePath}/chauffage/programme[?piece=<id>]`, `/absent`, `/horsgel` : modes du chauffage
+- `GET {basePath}/chauffage/planning/appliquer`, `/temp?g=&i=&t=`, `/reveil?j=&h=`, `/ancien`, `/origine` : programme maison

@@ -15,6 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const netatmo = require('./netatmo');
+const programme = require('./programme');
 
 const CONFIG_PATH = process.env.ECRAN_CONFIG || path.join(__dirname, 'config.json');
 const JETON_PATH = netatmo.cheminJeton(CONFIG_PATH);
@@ -59,6 +60,24 @@ function resumeProgramme(sch, rooms, tz) {
   if (!p) return;
   console.log('  aujourd\'hui (' + JOURS[p.jourSemaine] + ') : ' + p.jour.map(c => hm(c.debut) + ' ' + c.nom).join(' · '));
   console.log('  maintenant : ' + p.actif.nom + (p.suivant ? ' · puis ' + p.suivant.nom + ' ' + (p.suivant.jours === 0 ? '' : p.suivant.jours === 1 ? 'demain ' : 'dans ' + p.suivant.jours + ' jours ') + 'à ' + hm(p.suivant.min) : ''));
+}
+
+/* ---------- programme maison de l'écran, à blanc : rien n'est envoyé ----------
+   montre dans quelle ligne du programme tombe chaque pièce, et si le planning tient
+   dans les limites netatmo, avant d'appuyer sur « appliquer » sur l'ipad */
+function resumeProgrammeMaison(rooms, sch) {
+  let def = programme.copie(programme.DEFAUT);
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(path.dirname(CONFIG_PATH), 'programme-maison.json'), 'utf8'));
+    if (j.modifie && j.def) def = j.def;
+  } catch (e) { /* jamais retouché depuis l'écran : programme par défaut */ }
+  const comp = programme.compiler(def, rooms.map(r => ({ id: r.id, nom: r.name, type: r.type })), sch);
+  console.log('programme maison de l\'écran (à blanc, rien n\'est envoyé) : ' +
+    (comp.erreur || comp.nbZones + ' zones · ' + comp.nbCreneaux + ' créneaux/semaine · réveil ' + def.reveil.semaine + ' en semaine, ' + def.reveil.weekend + ' le week-end'));
+  (comp.repartition || []).forEach(p => {
+    const g = def.groupes.find(x => x.cle === p.groupe) || {};
+    console.log('  ' + p.nom + ' → ' + g.nom + (p.comment === 'nom' ? '' : ' (reconnue par ' + p.comment + ')'));
+  });
 }
 
 (async () => {
@@ -112,5 +131,6 @@ function resumeProgramme(sch, rooms, tz) {
     else console.log('aucun programme de chauffage');
     const autres = therm.filter(s => s !== sch).map(s => '« ' + s.name + ' »');
     if (autres.length) console.log('autres programmes : ' + autres.join(', '));
+    resumeProgrammeMaison(rooms, sch);
   }
 })().catch(e => sortie('erreur inattendue : ' + e.message));

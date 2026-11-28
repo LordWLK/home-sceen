@@ -84,20 +84,31 @@ async function jetonAcces(cfg, f, forcer) {
 }
 
 /* ---------- api ----------
-   appel(cfg, fichierJeton, chemin, params, acces?, journal?) → { corps, acces }
+   appel(cfg, fichierJeton, chemin, params, acces?, journal?, json?) → { corps, acces }
    POST en formulaire. si netatmo refuse le jeton d'accès (codes 2 et 3), on le renouvelle
-   une fois et on réessaie. les commandes (set…) répondent { status: 'ok' } sans corps. */
-async function appel(cfg, f, chemin, params, acces, journal) {
+   une fois et on réessaie. les commandes (set…) répondent { status: 'ok' } sans corps.
+   json : corps en json (home_id, schedule_id et name aussi dans l'url, comme pyatmo),
+   pour les plannings dont les zones et les créneaux sont des tableaux. */
+async function appel(cfg, f, chemin, params, acces, journal, json) {
   acces = acces || await jetonAcces(cfg, f, false);
+  params = params || {};
   for (let essai = 0; essai < 2; essai++) {
-    let r, j;
+    let r, j, url = API + chemin, entetes, corps;
+    if (json) {
+      const q = {};
+      ['home_id', 'schedule_id', 'name'].forEach(k => { if (params[k] != null) q[k] = params[k]; });
+      url += '?' + new URLSearchParams(q);
+      entetes = { Authorization: 'Bearer ' + acces.jeton, 'Content-Type': 'application/json' };
+      corps = JSON.stringify(params);
+    } else {
+      // un tableau en formulaire part sérialisé en json (c'est ainsi que netatmo le relit)
+      const p = {};
+      Object.keys(params).forEach(k => { p[k] = params[k] !== null && typeof params[k] === 'object' ? JSON.stringify(params[k]) : params[k]; });
+      entetes = { Authorization: 'Bearer ' + acces.jeton, 'Content-Type': 'application/x-www-form-urlencoded' };
+      corps = new URLSearchParams(p);
+    }
     try {
-      r = await fetch(API + chemin, {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + acces.jeton, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(params || {}),
-        signal: AbortSignal.timeout(15000),
-      });
+      r = await fetch(url, { method: 'POST', headers: entetes, body: corps, signal: AbortSignal.timeout(15000) });
       j = await r.json().catch(() => ({}));
     } catch (e) { throw new ErreurNetatmo(chemin + ' : netatmo injoignable (' + e.message + ')', 'reseau'); }
     if (r.ok && (j.body || j.status === 'ok')) return { corps: j.body || {}, acces: acces };
@@ -109,7 +120,25 @@ async function appel(cfg, f, chemin, params, acces, journal) {
     }
     if (code === 13) throw new ErreurNetatmo(chemin + ' : jeton sans les droits thermostat. régénère-le en cochant read_thermostat et write_thermostat.', 13);
     if (code === 26 || r.status === 429) throw new ErreurNetatmo(chemin + ' : limite d\'appels netatmo atteinte, réessaie dans une heure.', 26);
-    throw new ErreurNetatmo(chemin + ' : erreur ' + r.status + ' ' + JSON.stringify(j.error || j).slice(0, 200), r.status);
+    throw new ErreurNetatmo(chemin + ' : erreur ' + r.status + ' ' + JSON.stringify(j.error || j).slice(0, 200), code || r.status);
+  }
+}
+
+/* écriture d'un planning (createnewhomeschedule, synchomeschedule) : netatmo documente
+   des tableaux (zones, timetable). on les envoie en json comme pyatmo ; si netatmo répond
+   « argument manquant ou invalide » (codes 10 et 21), on retente une fois en formulaire,
+   tableaux sérialisés en json, comme l'adaptateur iobroker. un appel refusé n'a rien écrit. */
+async function appelPlanning(cfg, f, chemin, params, journal) {
+  try {
+    const r = await appel(cfg, f, chemin, params, null, journal, true);
+    if (journal) journal(chemin + ' accepté (corps json)');
+    return r;
+  } catch (e) {
+    if (!(e.code === 10 || e.code === 21 || e.code === 400)) throw e;
+    if (journal) journal(chemin + ' refusé en json (' + e.message.slice(0, 120) + '), nouvel essai en formulaire');
+    const r = await appel(cfg, f, chemin, params, null, journal, false);
+    if (journal) journal(chemin + ' accepté (formulaire)');
+    return r;
   }
 }
 
@@ -133,14 +162,17 @@ function semaine(tz, date) {
   return { jour: jour, min: (+p.hour % 24) * 60 + +p.minute };
 }
 const SEMAINE = 7 * 1440;
-/* programme(sch, roomId, tz, date) → {
+/* programme(sch, roomId, tz, date, parTemp) → {
      jour : créneaux du jour [{ debut, fin (minutes locales, fin ≤ 1440), nom, temp, etat: passe|en-cours|a-venir }],
      actif : { nom, temp }, suivant : { nom, temp, dans (minutes), jours (0 aujourd'hui, 1 demain…), min (heure locale) },
-     jourSemaine : 0 = lundi } */
-function programme(sch, roomId, tz, date) {
+     jourSemaine : 0 = lundi }
+   parTemp : deux créneaux qui se suivent à la même température pour cette pièce n'en font
+   qu'un (planning à plusieurs pièces, où une zone change souvent pour une autre pièce) */
+function programme(sch, roomId, tz, date, parTemp) {
   const zones = {};
   (sch.zones || []).forEach(z => { zones[z.id] = z; });
   const zone = c => { const z = zones[c.zone_id] || {}; return { nom: nomZone(z), temp: tempZone(z, roomId) }; };
+  const cle = c => (parTemp ? String(tempZone(zones[c.zone_id] || {}, roomId)) : c.zone_id);
   const tt = (sch.timetable || []).slice().sort((a, b) => a.m_offset - b.m_offset);
   if (!tt.length) return null;
   const now = semaine(tz, date);
@@ -151,7 +183,7 @@ function programme(sch, roomId, tz, date) {
   // deux créneaux qui se suivent dans la même zone n'en font qu'un à l'écran
   const bornes = [{ zone_id: minuit.zone_id, m_offset: debut }]
     .concat(tt.filter(c => c.m_offset > debut && c.m_offset < debut + 1440))
-    .filter((c, i, l) => i === 0 || c.zone_id !== l[i - 1].zone_id);
+    .filter((c, i, l) => i === 0 || cle(c) !== cle(l[i - 1]));
   const jour = bornes.map((c, i) => {
     const d = c.m_offset - debut, f = i + 1 < bornes.length ? bornes[i + 1].m_offset - debut : 1440;
     const z = zone(c);
@@ -163,7 +195,7 @@ function programme(sch, roomId, tz, date) {
   let suivant = null;
   for (let k = 0; k < tt.length * 2 && !suivant; k++) {
     const c = tt[k % tt.length], off = c.m_offset + (k >= tt.length ? SEMAINE : 0);
-    if (off > ici && c.zone_id !== actif.zone_id) suivant = { c: c, off: off };
+    if (off > ici && cle(c) !== cle(actif)) suivant = { c: c, off: off };
   }
   const res = { jour: jour, actif: zone(actif), suivant: null, jourSemaine: now.jour };
   if (suivant) {
@@ -174,6 +206,6 @@ function programme(sch, roomId, tz, date) {
 }
 
 module.exports = {
-  ErreurNetatmo, cheminJeton, jetonAcces, appel,
+  ErreurNetatmo, cheminJeton, jetonAcces, appel, appelPlanning,
   THERMIQUES, PILOTES, TYPES_ZONE, nomZone, tempZone, semaine, programme,
 };

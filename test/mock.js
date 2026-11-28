@@ -12,6 +12,8 @@
             MOCK_NETATMO=0 node test/mock.js  (pas de thermostat configuré)
             MOCK_NETATMO=panne node test/mock.js  (api netatmo injoignable)
             MOCK_DEDANS=16.8 node test/mock.js  (température mesurée du thermostat simulé)
+            MOCK_PLANNING=form | refus          (plannings refusés en json, ou refusés tout court)
+            MOCK_FENETRE=1, MOCK_PILES=1        (fenêtre ouverte en salle de bain, piles faibles)
 
    captures : NODE_PATH=$(npm root -g) node test/capture.js   (voir capture.js) */
 'use strict';
@@ -229,68 +231,162 @@ function enCours() {
   };
 }
 
-/* ---------- netatmo (thermostat), calqué sur le vrai calibrage ----------
-   une maison, la salle à manger, relais NAPlug + thermostat NATherm1, programme
-   « Mon planning de chauffe » : nuit 17° jusqu'à 8 h, confort 20° jusqu'à 23 h, tous les jours.
-   jetons tournants comme le vrai : seul le dernier refresh token émis est accepté. */
-// MOCK_DEDANS=16.8 : pièce plus froide que la consigne, la chaudière chauffe
-const NT = { valide: 'mock-refresh-0', n: 0, acces: '', modeMaison: 'schedule', manuel: null, mesure: parseFloat(process.env.MOCK_DEDANS) || 19.4 };
+/* ---------- netatmo (thermostat + vannes), calqué sur l'installation réelle ----------
+   une maison, relais NAPlug + thermostat NATherm1 dans la salle à manger, et les 7 vannes
+   posées fin novembre 2026 : 2 dans la chambre, bureau de doudou, bureau de ninès, salle de
+   bain, cuisine, salon. programme « Mon planning de chauffe » au départ (nuit jusqu'à 8 h,
+   confort jusqu'à 23 h) ; l'écran peut créer, mettre à jour et activer d'autres plannings.
+   jetons tournants comme le vrai : seul le dernier refresh token émis est accepté.
+   le faux vérifie les plannings reçus comme on attend de netatmo (12 zones au plus,
+   150 créneaux, toutes les pièces dans chaque zone, créneaux triés depuis lundi 0 h). */
+// MOCK_DEDANS=16.8 : salle à manger plus froide que la consigne, la chaudière chauffe
+// MOCK_PLANNING=form : refuse les plannings en json (code 21), pour éprouver le repli en formulaire
+// MOCK_PLANNING=refus : refuse tous les plannings · MOCK_FENETRE=1 : fenêtre ouverte en salle de bain
+// MOCK_PILES=1 : piles faibles dans le bureau de ninès
+const { programme: progNetatmo } = require(path.join(RACINE, 'netatmo.js'));
 const NT_HOME = 'mock-home', NT_ROOM = 'mock-room', NT_THERM = '70:ee:50:00:00:01', NT_PLUG = '70:ee:50:00:00:02';
-const ntZone = (id, type, name, t) => ({ id: id, type: type, name: name, rooms: [{ id: NT_ROOM, therm_setpoint_temperature: t }] });
+const NT_PIECES = [
+  { id: 'mock-chambre', name: 'Chambre', type: 'bedroom', vannes: 2, mesure: 18.6 },
+  { id: 'mock-doudou', name: 'Bureau de Doudou', type: 'custom', vannes: 1, mesure: 19.2 },
+  { id: 'mock-nines', name: 'Bureau de Ninès', type: 'custom', vannes: 1, mesure: 20.4 },
+  { id: 'mock-sdb', name: 'Salle de bain', type: 'bathroom', vannes: 1, mesure: 21.1 },
+  { id: 'mock-cuisine', name: 'Cuisine', type: 'kitchen', vannes: 1, mesure: 19.8 },
+  { id: 'mock-salon', name: 'Salon', type: 'livingroom', vannes: 1, mesure: 19.6 },
+  { id: NT_ROOM, name: 'Salle à manger', type: 'dining_room', vannes: 0, mesure: parseFloat(process.env.MOCK_DEDANS) || 19.4 },
+];
+let nv = 0;
+NT_PIECES.forEach(p => { p.modules = []; for (let i = 0; i < p.vannes; i++) p.modules.push('09:00:00:00:00:' + String(++nv).padStart(2, '0')); });
+NT_PIECES[NT_PIECES.length - 1].modules = [NT_THERM];
+const ntZone = (id, type, name, tv, tt) => ({ id: id, type: type, name: name,
+  rooms: NT_PIECES.map(p => ({ id: p.id, therm_setpoint_temperature: p.id === NT_ROOM ? tt : tv })) });
 const NT_TIMETABLE = [{ zone_id: 1, m_offset: 0 }];
 for (let j = 0; j < 7; j++) NT_TIMETABLE.push({ zone_id: 0, m_offset: j * 1440 + 480 }, { zone_id: 1, m_offset: j * 1440 + 1380 });
+const NT = {
+  valide: 'mock-refresh-0', n: 0, acces: '', modeMaison: 'schedule', manuel: {}, choisi: 'mock-planning', nPlanning: 0,
+  plannings: [{
+    id: 'mock-planning', name: 'Mon planning de chauffe', type: 'therm', hg_temp: 7, away_temp: 12,
+    // les vannes ajoutées prennent les températures par défaut de l'appli (19 / 16)
+    zones: [ntZone(0, 0, 'Comfort', 19, 20), ntZone(1, 1, 'Night', 16, 17), ntZone(3, 8, 'Comfort+', 21, 18), ntZone(4, 5, 'Eco', 16, 16)],
+    timetable: NT_TIMETABLE,
+  }],
+};
+const ntChoisi = () => NT.plannings.find(s => s.id === NT.choisi) || NT.plannings[0];
 function ntHomesdata() {
+  const modules = [{ id: NT_PLUG, type: 'NAPlug', name: 'Netatmo Relay', modules_bridged: [NT_THERM].concat(...NT_PIECES.map(p => p.vannes ? p.modules : [])) }];
+  NT_PIECES.forEach(p => p.modules.forEach((m, i) => modules.push(m === NT_THERM
+    ? { id: NT_THERM, type: 'NATherm1', name: 'Netatmo Smart Thermostat', room_id: p.id, bridge: NT_PLUG }
+    : { id: m, type: 'NRV', name: p.name + (p.vannes > 1 ? ' ' + (i + 1) : ''), room_id: p.id, bridge: NT_PLUG })));
   return { status: 'ok', body: { homes: [{
     id: NT_HOME, name: 'Mon domicile', timezone: 'Europe/Paris', therm_mode: NT.modeMaison,
     therm_setpoint_default_duration: 180, temperature_control_mode: 'heating',
-    rooms: [{ id: NT_ROOM, name: 'Salle à manger', type: 'dining_room', module_ids: [NT_THERM] }],
-    modules: [
-      { id: NT_PLUG, type: 'NAPlug', name: 'Netatmo Relay', modules_bridged: [NT_THERM] },
-      { id: NT_THERM, type: 'NATherm1', name: 'Netatmo Smart Thermostat', room_id: NT_ROOM, bridge: NT_PLUG },
-    ],
-    schedules: [{
-      id: 'mock-planning', name: 'Mon planning de chauffe', type: 'therm', selected: true, hg_temp: 7, away_temp: 12,
-      zones: [ntZone(0, 0, 'Comfort', 20), ntZone(1, 1, 'Night', 17), ntZone(3, 8, 'Comfort+', 18), ntZone(4, 5, 'Eco', 16)],
-      timetable: NT_TIMETABLE,
-    }],
+    rooms: NT_PIECES.map(p => ({ id: p.id, name: p.name, type: p.type, module_ids: p.modules })).concat([{ id: 'mock-entree', name: 'Entrée', type: 'lobby', module_ids: [] }]),
+    modules: modules,
+    schedules: NT.plannings.map(s => Object.assign({}, s, { selected: s.id === NT.choisi })),
   }], user: { email: 'personne@exemple.fr', id: 'mock-user' } } };
 }
 function ntHomestatus() {
-  const h = new Date().getHours(), maintenant = Math.floor(Date.now() / 1000);
-  let mode = 'schedule', temp = h >= 8 && h < 23 ? 20 : 17, fin = 0;
-  if (NT.modeMaison === 'away') { mode = 'away'; temp = 12; }
-  else if (NT.modeMaison === 'hg') { mode = 'hg'; temp = 7; }
-  else if (NT.manuel && NT.manuel.fin > maintenant) { mode = 'manual'; temp = NT.manuel.temp; fin = NT.manuel.fin; }
-  return { status: 'ok', body: { home: { id: NT_HOME,
-    rooms: [{ id: NT_ROOM, reachable: true, therm_measured_temperature: NT.mesure, therm_setpoint_temperature: temp,
-      therm_setpoint_mode: mode, therm_setpoint_end_time: fin, anticipating: false, open_window: false }],
-    modules: [
-      { id: NT_PLUG, type: 'NAPlug', firmware_revision: 200, rf_strength: 80, wifi_strength: 50 },
-      { id: NT_THERM, type: 'NATherm1', reachable: true, battery_state: 'full', boiler_status: NT.mesure < temp - 0.1, anticipating: false, bridge: NT_PLUG },
-    ] } } };
+  const maintenant = Math.floor(Date.now() / 1000), sch = ntChoisi();
+  let chaudiere = false;
+  const rooms = NT_PIECES.map(p => {
+    let mode = 'schedule', temp, fin = 0;
+    const man = NT.manuel[p.id];
+    if (NT.modeMaison === 'away') { mode = 'away'; temp = sch.away_temp; }
+    else if (NT.modeMaison === 'hg') { mode = 'hg'; temp = sch.hg_temp; }
+    else if (man && man.fin > maintenant) { mode = man.mode; temp = man.mode === 'max' ? 30 : man.temp; fin = man.fin; }
+    else temp = progNetatmo(sch, p.id, 'Europe/Paris', new Date(), true).actif.temp;
+    const demande = p.mesure < temp - 0.1;
+    if (demande) chaudiere = true;
+    const r = { id: p.id, reachable: true, therm_measured_temperature: p.mesure, therm_setpoint_temperature: temp,
+      therm_setpoint_mode: mode, therm_setpoint_end_time: fin, anticipating: false,
+      open_window: process.env.MOCK_FENETRE === '1' && p.id === 'mock-sdb' };
+    if (p.vannes) r.heating_power_request = demande && !r.open_window ? 100 : 0;
+    return r;
+  });
+  const modules = [{ id: NT_PLUG, type: 'NAPlug', firmware_revision: 200, rf_strength: 80, wifi_strength: 50 }];
+  NT_PIECES.forEach(p => p.modules.forEach(m => modules.push(m === NT_THERM
+    ? { id: NT_THERM, type: 'NATherm1', reachable: true, battery_state: 'full', boiler_status: chaudiere, anticipating: false, bridge: NT_PLUG }
+    : { id: m, type: 'NRV', reachable: true, battery_state: process.env.MOCK_PILES === '1' && p.id === 'mock-nines' ? 'low' : 'full', rf_strength: 60, bridge: NT_PLUG })));
+  return { status: 'ok', body: { home: { id: NT_HOME, rooms: rooms, modules: modules } } };
 }
-function netatmoFaux(chemin, opt) {
+// lecture d'une requête : corps json (avec home_id… dans l'url) ou formulaire (tableaux en json)
+function ntParams(url, opt) {
+  const h = (opt && opt.headers) || {}, corps = String((opt && opt.body) || '');
+  const q = {};
+  new URLSearchParams(String(url).split('?')[1] || '').forEach((v, k) => { q[k] = v; });
+  if (/json/.test(h['Content-Type'] || '')) {
+    try { return { json: true, p: Object.assign(q, JSON.parse(corps)) }; } catch (e) { return { json: true, p: q, illisible: true }; }
+  }
+  const p = Object.assign(q, {});
+  new URLSearchParams(corps).forEach((v, k) => { p[k] = /^(zones|timetable)$/.test(k) ? (() => { try { return JSON.parse(v); } catch (e) { return null; } })() : v; });
+  return { json: false, p: p };
+}
+const ntRefus = msg => new Response(JSON.stringify({ error: { code: 21, message: 'Invalid argument : ' + msg } }), { status: 400 });
+function ntVerifiePlanning(p) {
+  const tt = p.timetable, zs = p.zones;
+  if (!Array.isArray(tt) || !tt.length) return 'timetable';
+  if (!Array.isArray(zs) || !zs.length) return 'zones';
+  if (zs.length > 12) return 'trop de zones (' + zs.length + ')';
+  if (tt.length > 150) return 'trop de créneaux (' + tt.length + ')';
+  if (tt[0].m_offset !== 0) return 'premier créneau pas à lundi 0 h';
+  for (let i = 1; i < tt.length; i++) if (!(tt[i].m_offset > tt[i - 1].m_offset) || tt[i].m_offset >= 10080) return 'créneaux non triés';
+  const ids = zs.map(z => z.id);
+  if (tt.some(c => ids.indexOf(c.zone_id) < 0)) return 'zone inconnue dans timetable';
+  for (const z of zs) {
+    if (!Number.isInteger(z.id) || !Number.isInteger(z.type)) return 'zone sans id ou type';
+    for (const piece of NT_PIECES) {
+      const r = (z.rooms || []).find(x => x.id === piece.id);
+      if (!r || typeof r.therm_setpoint_temperature !== 'number' || r.therm_setpoint_temperature < 7 || r.therm_setpoint_temperature > 30) return 'pièce ' + piece.name + ' absente ou hors bornes dans la zone ' + z.id;
+    }
+  }
+  if (typeof Number(p.hg_temp) !== 'number' || isNaN(Number(p.hg_temp)) || isNaN(Number(p.away_temp))) return 'hg_temp / away_temp';
+  return '';
+}
+function netatmoFaux(chemin, url, opt) {
   if (NETATMO === 'panne') throw new TypeError('fetch failed (netatmo simulé en panne)');
-  const p = new URLSearchParams(String((opt && opt.body) || ''));
   if (chemin === 'oauth2/token') {
+    const p = new URLSearchParams(String((opt && opt.body) || ''));
     if (p.get('refresh_token') !== NT.valide) return json400({ error: 'invalid_grant' });
     NT.n++; NT.valide = 'mock-refresh-' + NT.n; NT.acces = 'mock-acces-' + NT.n;
     return json({ access_token: NT.acces, refresh_token: NT.valide, expires_in: 10800 });
   }
   const auth = String((opt && opt.headers && opt.headers.Authorization) || '');
   if (auth !== 'Bearer ' + NT.acces) return new Response(JSON.stringify({ error: { code: 3, message: 'Access token expired' } }), { status: 403 });
-  const ok = () => json({ status: 'ok', time_server: Math.floor(Date.now() / 1000) });
+  const ok = body => json(Object.assign({ status: 'ok', time_server: Math.floor(Date.now() / 1000) }, body ? { body: body } : {}));
+  const lu = ntParams(url, opt), p = lu.p;
   if (chemin === 'api/homesdata') return json(ntHomesdata());
   if (chemin === 'api/homestatus') return json(ntHomestatus());
   if (chemin === 'api/setroomthermpoint') {
-    if (p.get('mode') === 'manual') NT.manuel = { temp: parseFloat(p.get('temp')), fin: parseInt(p.get('endtime'), 10) };
-    else if (p.get('mode') === 'home') NT.manuel = null;
+    if (!NT_PIECES.some(x => x.id === p.room_id)) return ntRefus('room_id');
+    if (p.mode === 'manual' || p.mode === 'max') NT.manuel[p.room_id] = { mode: p.mode, temp: parseFloat(p.temp), fin: parseInt(p.endtime, 10) || Math.floor(Date.now() / 1000) + 10800 };
+    else if (p.mode === 'home') delete NT.manuel[p.room_id];
     return ok();
   }
   if (chemin === 'api/setthermmode') {
-    NT.modeMaison = p.get('mode');
-    if (NT.modeMaison !== 'schedule') NT.manuel = null; // absent et hors-gel annulent un réglage manuel
+    NT.modeMaison = p.mode;
+    if (NT.modeMaison !== 'schedule') NT.manuel = {}; // absent et hors-gel annulent les réglages manuels
     return ok();
+  }
+  if (chemin === 'api/switchhomeschedule') {
+    if (!NT.plannings.some(s => s.id === p.schedule_id)) return ntRefus('schedule_id');
+    NT.choisi = p.schedule_id;
+    return ok();
+  }
+  if (chemin === 'api/createnewhomeschedule' || chemin === 'api/synchomeschedule') {
+    if (process.env.MOCK_PLANNING === 'refus' || (process.env.MOCK_PLANNING === 'form' && lu.json)) return ntRefus('planning refusé par le faux netatmo');
+    const err = lu.illisible ? 'json illisible' : ntVerifiePlanning(p);
+    if (err) { console.log('[mock] ' + chemin + ' refusé : ' + err); return ntRefus(err); }
+    const champs = { name: p.name, hg_temp: Number(p.hg_temp), away_temp: Number(p.away_temp), zones: p.zones, timetable: p.timetable };
+    if (chemin === 'api/synchomeschedule') {
+      const s = NT.plannings.find(x => x.id === p.schedule_id);
+      if (!s) return ntRefus('schedule_id');
+      Object.assign(s, champs, { name: p.name || s.name });
+      console.log('[mock] planning « ' + s.name + ' » mis à jour (' + (lu.json ? 'json' : 'formulaire') + ') : ' + p.zones.length + ' zones, ' + p.timetable.length + ' créneaux');
+      return ok();
+    }
+    const id = 'mock-planning-' + (++NT.nPlanning);
+    NT.plannings.push(Object.assign({ id: id, type: 'therm' }, champs));
+    console.log('[mock] planning « ' + p.name + ' » créé (' + (lu.json ? 'json' : 'formulaire') + ') : ' + p.zones.length + ' zones, ' + p.timetable.length + ' créneaux');
+    return ok({ schedule_id: id });
   }
   return new Response(JSON.stringify({ error: { code: 404, message: 'inconnu' } }), { status: 404 });
 }
@@ -301,7 +397,7 @@ const html = s => new Response(s, { status: 200, headers: { 'content-type': 'tex
 const vide = code => new Response(null, { status: code });
 const json400 = o => new Response(JSON.stringify(o), { status: 400, headers: { 'content-type': 'application/json' } });
 const ROUTES = [
-  [/api\.netatmo\.com\/(oauth2\/token|api\/\w+)/, (m, opt) => netatmoFaux(m[1], opt)],
+  [/api\.netatmo\.com\/(oauth2\/token|api\/\w+)/, (m, opt, u) => netatmoFaux(m[1], u, opt)],
   [/api\.open-meteo\.com/, () => json(meteo())],
   [/football-data\.org\/v4\/teams\/(\d+)\/matches/, m => json(foot(+m[1]))],
   [/espn\.com\/.*\/basketball\/nba\/teams\/(\w+)\/schedule/, m => json(nba(m[1]))],
@@ -320,7 +416,7 @@ global.fetch = async function (url, opt) {
   const u = String(url);
   for (const [re, fn] of ROUTES) {
     const m = u.match(re);
-    if (m) { if (VERBOSE) console.log('[mock] ' + u); return fn(m, opt); }
+    if (m) { if (VERBOSE) console.log('[mock] ' + u); return fn(m, opt, u); }
   }
   if (VERBOSE) console.log('[mock] 404 ' + u);
   return vide(404);
@@ -346,6 +442,8 @@ const TMP = path.join(__dirname, 'tmp');
 fs.mkdirSync(TMP, { recursive: true });
 // le faux netatmo repart de son premier jeton à chaque lancement : on efface la chaîne précédente
 try { fs.unlinkSync(path.join(TMP, 'netatmo-jeton.json')); } catch (e) { /* pas de chaîne précédente */ }
+// le programme maison repart aussi de zéro (jamais appliqué), sauf MOCK_GARDER=1
+if (process.env.MOCK_GARDER !== '1') { try { fs.unlinkSync(path.join(TMP, 'programme-maison.json')); } catch (e) { /* rien à effacer */ } }
 const cfgPath = path.join(TMP, 'config.json');
 fs.writeFileSync(cfgPath, JSON.stringify(CFG, null, 2) + '\n');
 process.env.ECRAN_CONFIG = cfgPath;

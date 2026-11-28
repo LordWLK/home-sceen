@@ -8,7 +8,9 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const ical = require('node-ical');
+const crypto = require('crypto');
 const netatmo = require('./netatmo'); // client minimal de l'api netatmo (thermostat), sans dépendance
+const programme = require('./programme'); // programme maison : planning pièce par pièce, compilé pour netatmo
 
 // chemin du config : ECRAN_CONFIG (harnais de test) sinon config.json à côté du serveur
 const CONFIG_PATH = process.env.ECRAN_CONFIG || path.join(__dirname, 'config.json');
@@ -871,11 +873,13 @@ async function majCinema() {
 }
 
 /* ============================================================
-   chauffage · thermostat netatmo (api energy)
+   chauffage · thermostat et vannes netatmo (api energy)
    jeton tournant partagé avec debug-netatmo.js via netatmo-jeton.json
    (voir netatmo.js). homestatus toutes les 5 min, homesdata (pièces,
-   programme) toutes les heures. les commandes sont bornées et
+   programmes) toutes les heures. les commandes sont bornées et
    espacées d'au moins 1 s ; l'écran cumule les appuis −/+ avant d'envoyer.
+   toutes les pièces équipées (thermostat, vannes) sont suivies ; la pièce
+   du thermostat reste la « pièce principale » (accueil, menu).
    ============================================================ */
 const JETON_NETATMO = netatmo.cheminJeton(CONFIG_PATH);
 const chauffageActif = () => !!(CFG.netatmo && CFG.netatmo.clientId && CFG.netatmo.clientSecret && CFG.netatmo.refreshToken);
@@ -884,6 +888,7 @@ const BORNES_CONSIGNE = {
   max: Number(CFG.chauffage && CFG.chauffage.consigneMax) || 23,
   pas: 0.5,
 };
+const CHAUFFANTS = /^(NATherm1|NRV|OTM|BNS)$/; // modules posés dans une pièce (le relais n'en fait pas une pièce chauffée)
 const journalNetatmo = m => console.log('[netatmo]', m);
 const degres = n => (n == null ? '—' : String(Math.round(n * 10) / 10).replace('.', ',') + '°');
 const hmLocal = min => Math.floor(min / 60) + ' h' + (min % 60 ? ' ' + String(min % 60).padStart(2, '0') : '');
@@ -902,65 +907,200 @@ function libelleCreneau(c) {
   if (c.fin === 1440) return 'dès ' + hmLocal(c.debut);
   return hmLocal(c.debut) + ' à ' + hmLocal(c.fin);
 }
+// erreur à montrer telle quelle sur l'écran (les erreurs netatmo restent dans le journal)
+class ErreurEcran extends Error {}
 
-let chTopo = null;   // maison, pièce principale, programme (homesdata)
-let chBrut = null;   // dernier état brut de la pièce et du thermostat (homestatus)
+/* ---------- programme maison : préparamétré, retouché depuis l'écran ----------
+   programme-maison.json (gitignoré, à côté de config.json) garde le planning appliqué
+   (id netatmo, date, empreinte, planning d'avant) et, seulement s'il a été retouché
+   depuis l'écran, la définition elle-même. sinon c'est programme.DEFAUT qui fait foi. */
+const FICHIER_PLANNING = path.join(path.dirname(CONFIG_PATH), 'programme-maison.json');
+function lirePlanning() {
+  let j = {};
+  try { j = JSON.parse(fs.readFileSync(FICHIER_PLANNING, 'utf8')) || {}; } catch (e) { /* pas encore de fichier */ }
+  const retouche = !!(j.modifie && j.def && Array.isArray(j.def.groupes));
+  return { def: retouche ? j.def : programme.copie(programme.DEFAUT), modifie: retouche, applique: j.applique || null };
+}
+function sauverPlanning() {
+  const o = { applique: chPlanning.applique, modifie: chPlanning.modifie };
+  if (chPlanning.modifie) o.def = chPlanning.def;
+  const tmp = FICHIER_PLANNING + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(o, null, 2) + '\n');
+  fs.renameSync(tmp, FICHIER_PLANNING);
+}
+const chPlanning = lirePlanning();
+let chPlanningErreur = '';
+const empreinte = comp => crypto.createHash('sha1')
+  .update(JSON.stringify([comp.zones, comp.timetable, comp.hg_temp, comp.away_temp])).digest('hex').slice(0, 16);
+
+let chTopo = null;   // maison, pièces chauffées, programmes (homesdata)
+let chBrut = null;   // dernier état brut des pièces et des modules (homestatus) : { rooms, mods }
 async function topoChauffage(forcer) {
   if (chTopo && !forcer && Date.now() - chTopo.lu < 3600000) return chTopo;
   const { corps } = await netatmo.appel(CFG.netatmo, JETON_NETATMO, 'api/homesdata', null, null, journalNetatmo);
   const maisons = (corps.homes || []).filter(h => (h.modules || []).some(m => netatmo.THERMIQUES.test(m.type)));
   if (!maisons.length) throw new Error('aucune maison avec un thermostat sur ce compte');
   const h = maisons[0];
-  const mods = h.modules || [];
-  const pilote = mods.find(m => netatmo.PILOTES.test(m.type)); // le thermostat qui commande la chaudière
-  const pieces = (h.rooms || []).filter(r => (r.module_ids || []).some(id => mods.some(m => m.id === id && netatmo.THERMIQUES.test(m.type))));
+  const mods = (h.modules || []).filter(m => CHAUFFANTS.test(m.type));
+  const pilote = (h.modules || []).find(m => netatmo.PILOTES.test(m.type)); // le thermostat qui commande la chaudière
+  const dans = r => mods.filter(m => m.room_id === r.id || (r.module_ids || []).indexOf(m.id) >= 0);
+  const rep = programme.repartir(chPlanning.def, (h.rooms || []).map(r => ({ id: r.id, nom: r.name, type: r.type })));
+  const ordre = {};
+  chPlanning.def.groupes.forEach((g, i) => { ordre[g.cle] = i; });
+  const pieces = (h.rooms || []).filter(r => dans(r).length).map((r, i) => {
+    const ms = dans(r);
+    return {
+      id: r.id, nom: r.name, type: r.type, rang: i, groupe: rep.par[r.id],
+      modules: ms.map(m => m.id), vannes: ms.filter(m => m.type === 'NRV').length,
+      thermostat: ms.some(m => netatmo.PILOTES.test(m.type)),
+    };
+  }).sort((a, b) => (ordre[a.groupe] - ordre[b.groupe]) || (a.rang - b.rang));
   const principale = (pilote && pieces.find(r => r.id === pilote.room_id)) || pieces[0];
   if (!principale) throw new Error('aucune pièce chauffée');
   const progs = (h.schedules || []).filter(x => !x.type || x.type === 'therm');
   chTopo = {
     lu: Date.now(), homeId: h.id, tz: h.timezone || TZ,
-    piece: { id: principale.id, nom: principale.name },
+    piece: { id: principale.id, nom: principale.nom },
+    pieces: pieces,
     piloteId: pilote ? pilote.id : null,
     duree: h.therm_setpoint_default_duration || 180, // minutes d'un réglage manuel, comme dans l'app netatmo
     programme: progs.find(x => x.selected) || progs[0] || null,
+    plannings: progs.map(p => ({ id: p.id, nom: p.name, choisi: !!p.selected })),
   };
   return chTopo;
 }
 
-// état affichable, à partir de l'état brut de la pièce (homestatus) et du programme
-function etatChauffage(topo, room, mod) {
-  const prog = topo.programme ? netatmo.programme(topo.programme, topo.piece.id, topo.tz, new Date()) : null;
+// bornes d'une pièce : celles de la config, élargies aux températures de son programme (salle de bain à 25°)
+function bornesPiece(p) {
+  const g = chPlanning.def.groupes.find(x => x.cle === p.groupe);
+  const max = g ? Math.max.apply(null, [g.base].concat(g.plages.map(x => x.t))) : 0;
+  return { min: BORNES_CONSIGNE.min, max: Math.max(BORNES_CONSIGNE.max, Math.min(28, max)), pas: BORNES_CONSIGNE.pas };
+}
+
+// état affichable d'une pièce, à partir de son état brut (homestatus) et du programme en cours
+function etatPiece(topo, p, brut) {
+  const room = brut.rooms[p.id] || {};
+  const ms = p.modules.map(id => brut.mods[id] || {});
+  const pilote = brut.mods[topo.piloteId] || {};
+  const prog = topo.programme ? netatmo.programme(topo.programme, p.id, topo.tz, new Date(), true) : null;
   const mode = room.therm_setpoint_mode || 'schedule';
   const consigne = room.therm_setpoint_temperature;
   const fin = room.therm_setpoint_end_time || 0;
   const jusqua = fin ? " jusqu'à " + heureChauffage(fin) : '';
-  let etat;
-  if (mode === 'manual') etat = 'réglé à la main · ' + degres(consigne) + jusqua + ', puis retour au programme';
-  else if (mode === 'away') etat = 'mode absent · ' + degres(consigne) + jusqua;
-  else if (mode === 'hg') etat = 'hors-gel · ' + degres(consigne) + jusqua;
-  else if (mode === 'max') etat = 'chauffe à fond' + jusqua;
-  else if (mode === 'off') etat = 'chauffage coupé';
+  let etat, ligne;
+  if (mode === 'manual') { etat = 'réglé à la main · ' + degres(consigne) + jusqua + ', puis retour au programme'; ligne = 'à la main ' + degres(consigne); }
+  else if (mode === 'away') { etat = 'mode absent · ' + degres(consigne) + jusqua; ligne = 'absent ' + degres(consigne); }
+  else if (mode === 'hg') { etat = 'hors-gel · ' + degres(consigne) + jusqua; ligne = 'hors-gel ' + degres(consigne); }
+  else if (mode === 'max') { etat = 'chauffe à fond' + jusqua; ligne = 'à fond'; }
+  else if (mode === 'off') { etat = 'chauffage coupé'; ligne = 'coupé'; }
   else if (prog && prog.suivant) {
     const quand = (prog.suivant.jours === 0 ? '' : prog.suivant.jours === 1 ? 'demain ' :
       JOURS_PROG[(prog.jourSemaine + prog.suivant.jours) % 7] + ' ') + hmLocal(prog.suivant.min);
-    etat = 'au programme · ' + prog.actif.nom + " jusqu'à " + quand + ', puis ' + prog.suivant.nom + ' à ' + degres(prog.suivant.temp);
-  } else etat = 'au programme' + (prog ? ' · ' + prog.actif.nom + ' à ' + degres(prog.actif.temp) : '');
-  const chauffe = !!mod.boiler_status, anticipe = !!(room.anticipating || mod.anticipating), fenetre = !!room.open_window;
-  const joignable = room.reachable !== false && mod.reachable !== false;
-  const statut = !joignable ? 'thermostat injoignable'
-    : fenetre ? 'fenêtre ouverte, chauffe suspendue'
-    : anticipe && prog && prog.suivant ? 'préchauffe pour ' + hmLocal(prog.suivant.min)
-    : chauffe ? 'chauffe en cours' : 'chaudière au repos';
-  const sch = topo.programme || {};
+    etat = 'au programme · ' + degres(prog.actif.temp) + " jusqu'à " + quand + ', puis ' + degres(prog.suivant.temp);
+    ligne = 'consigne ' + degres(consigne);
+  } else { etat = 'au programme' + (prog ? ' · ' + degres(prog.actif.temp) : ''); ligne = 'consigne ' + degres(consigne); }
+  // une pièce à vannes dit elle-même si elle demande de la chaleur ; une pièce à thermostat seul, par la chaudière
+  const hpr = room.heating_power_request;
+  const chauffe = hpr != null ? hpr > 0 : !!(p.thermostat && pilote.boiler_status && room.therm_measured_temperature < consigne);
+  const anticipe = !!room.anticipating, fenetre = !!room.open_window;
+  const joignable = room.reachable !== false && ms.every(m => m.reachable !== false);
+  const piles = ms.some(m => /low/.test(String(m.battery_state || '')));
+  const statut = !joignable ? 'injoignable' : fenetre ? 'fenêtre ouverte'
+    : chauffe ? 'chauffe en cours' : anticipe && prog && prog.suivant ? 'préchauffe pour ' + hmLocal(prog.suivant.min) : 'au repos';
   return {
-    piece: topo.piece.nom,
+    id: p.id, nom: p.nom, court: String(p.nom || '').toLowerCase(), groupe: p.groupe, vannes: p.vannes, thermostat: p.thermostat,
     mesure: room.therm_measured_temperature, mesureTxt: degres(room.therm_measured_temperature),
     consigne: consigne, consigneTxt: degres(consigne),
-    mode: mode, fin: fin, etat: etat, statut: statut,
-    chauffe: chauffe, anticipe: anticipe, fenetre: fenetre, joignable: joignable,
+    mode: mode, fin: fin, etat: etat, ligne: ligne, statut: statut,
+    chauffe: chauffe, anticipe: anticipe, fenetre: fenetre, joignable: joignable, piles: piles,
     programme: prog ? prog.jour.map(c => ({ nom: c.nom, temp: degres(c.temp), quand: libelleCreneau(c), etat: c.etat })) : [],
+    bornes: bornesPiece(p),
+  };
+}
+
+// un planning réduit à ce qui compte : à quelle minute de la semaine chaque pièce change de
+// température (indépendant des numéros et des noms de zones que netatmo pourrait réécrire)
+function suiteTemperatures(sch, pieces) {
+  const zones = {};
+  (sch.zones || []).forEach(z => { zones[z.id] = z; });
+  let avant = null;
+  return (sch.timetable || []).slice().sort((x, y) => x.m_offset - y.m_offset).map(c => {
+    const v = pieces.map(p => netatmo.tempZone(zones[c.zone_id] || {}, p.id)).join('|');
+    if (v === avant) return '';
+    avant = v;
+    return c.m_offset + ':' + v;
+  }).filter(Boolean).join(',');
+}
+
+// le programme maison vu par l'écran : définition, pièces reconnues, état par rapport à netatmo
+function apercuPlanning(topo) {
+  const a = programme.apercu(chPlanning.def, topo ? topo.pieces : []);
+  // sous le nom de chaque ligne : ses pièces, ou son équipement si le nom de la pièce est celui de la ligne
+  a.groupes.forEach(g => {
+    const ps = topo ? topo.pieces.filter(p => p.groupe === g.cle) : [];
+    const equip = p => [p.vannes ? p.vannes + (p.vannes > 1 ? ' têtes' : ' tête') : '', p.thermostat ? 'thermostat' : ''].filter(Boolean).join(' + ');
+    if (ps.length === 1) {
+      const p = ps[0];
+      g.detail = (programme.sansAccents(p.nom).trim() === programme.sansAccents(g.nom).trim() ? '' : p.nom.toLowerCase() + ' · ') + equip(p);
+    } else g.detail = ps.map(p => p.nom.toLowerCase()).join(' · ');
+  });
+  const app = chPlanning.applique;
+  const nous = app && topo ? topo.plannings.find(p => p.id === app.scheduleId) : null;
+  let etat = 'brouillon';
+  a.differe = false;
+  if (!topo) etat = 'indisponible';
+  else if (nous && nous.choisi) {
+    const comp = programme.compiler(chPlanning.def, topo.pieces, topo.programme);
+    etat = !comp.erreur && empreinte(comp) === app.empreinte ? 'actif' : 'modifie';
+    // planning retouché dans l'appli netatmo depuis l'envoi : on le signale, sans rien écraser
+    if (etat === 'actif') a.differe = suiteTemperatures(topo.programme, topo.pieces) !== suiteTemperatures(comp, topo.pieces);
+  } else if (nous) etat = 'inactif';
+  const autre = topo && topo.plannings.find(p => p.id !== (nous && nous.id) && (app && app.precedentId ? p.id === app.precedentId : true));
+  a.etat = etat;
+  a.retouche = chPlanning.modifie;
+  a.enCours = topo && topo.programme ? topo.programme.name : '';
+  a.precedent = autre ? autre.nom : '';
+  a.appliqueLe = app && app.le ? quandLabel(new Date(app.le), false) : '';
+  a.erreurEnvoi = chPlanningErreur;
+  return a;
+}
+
+// tout l'état chauffage : la pièce principale à plat (accueil, menu, compatibilité), puis chaque pièce
+function etatChauffage(topo, brut) {
+  const pieces = topo.pieces.map(p => etatPiece(topo, p, brut));
+  const pr = pieces.find(p => p.id === topo.piece.id) || pieces[0];
+  const room = brut.rooms[topo.piece.id] || {};
+  const pilote = brut.mods[topo.piloteId] || {};
+  const prog = topo.programme ? netatmo.programme(topo.programme, topo.piece.id, topo.tz, new Date(), true) : null;
+  const chaudiere = !!pilote.boiler_status, anticipe = !!(room.anticipating || pilote.anticipating);
+  const statut = !pr.joignable ? 'thermostat injoignable'
+    : pr.fenetre ? 'fenêtre ouverte, chauffe suspendue'
+    : anticipe && prog && prog.suivant ? 'préchauffe pour ' + hmLocal(prog.suivant.min)
+    : chaudiere ? 'chauffe en cours' : 'chaudière au repos';
+  const sch = topo.programme || {};
+  // mode de la maison : absent et hors-gel valent pour toutes les pièces
+  const modeMaison = pieces.some(p => p.mode === 'away') ? 'away' : pieces.some(p => p.mode === 'hg') ? 'hg' : 'schedule';
+  const aLaMain = pieces.filter(p => p.mode === 'manual' || p.mode === 'max').length;
+  const chauffent = pieces.filter(p => p.chauffe).length;
+  let etatMaison;
+  if (modeMaison === 'away') etatMaison = 'mode absent · ' + degres(sch.away_temp) + ' partout';
+  else if (modeMaison === 'hg') etatMaison = 'hors-gel · ' + degres(sch.hg_temp) + ' partout';
+  else {
+    etatMaison = 'au programme · ' + String(sch.name || 'planning').toLowerCase();
+    if (aLaMain) etatMaison += ', ' + aLaMain + (aLaMain > 1 ? ' pièces réglées' : ' pièce réglée') + ' à la main';
+  }
+  etatMaison += ' · ' + (chaudiere ? 'la chaudière chauffe' : 'chaudière au repos');
+  return {
+    piece: topo.piece.nom, pieceId: topo.piece.id,
+    mesure: pr.mesure, mesureTxt: pr.mesureTxt, consigne: pr.consigne, consigneTxt: pr.consigneTxt,
+    mode: pr.mode, fin: pr.fin, etat: pr.etat, statut: statut,
+    chauffe: chaudiere, anticipe: anticipe, fenetre: pr.fenetre, joignable: pr.joignable,
+    programme: pr.programme,
     horsGel: sch.hg_temp, absent: sch.away_temp,
-    bornes: BORNES_CONSIGNE,
+    bornes: pr.bornes,
+    pieces: pieces,
+    maison: { mode: modeMaison, etat: etatMaison, chaudiere: chaudiere, chauffent: chauffent, aLaMain: aLaMain },
+    planning: apercuPlanning(topo),
     maj: Date.now(),
   };
 }
@@ -970,53 +1110,175 @@ async function majChauffage(forcerTopo) {
   const topo = await topoChauffage(forcerTopo);
   const { corps } = await netatmo.appel(CFG.netatmo, JETON_NETATMO, 'api/homestatus', { home_id: topo.homeId }, null, journalNetatmo);
   const sh = corps.home || {};
-  const room = (sh.rooms || []).find(r => r.id === topo.piece.id);
-  if (!room) throw new Error('pièce ' + topo.piece.nom + ' absente de homestatus');
-  const mod = (sh.modules || []).find(m => m.id === topo.piloteId) || {};
-  chBrut = { room: room, mod: mod };
-  donnees.chauffage = etatChauffage(topo, room, mod);
+  const rooms = {}, mods = {};
+  (sh.rooms || []).forEach(r => { rooms[r.id] = r; });
+  (sh.modules || []).forEach(m => { mods[m.id] = m; });
+  if (!rooms[topo.piece.id]) throw new Error('pièce ' + topo.piece.nom + ' absente de homestatus');
+  chBrut = { rooms: rooms, mods: mods };
+  donnees.chauffage = etatChauffage(topo, chBrut);
   sante.chauffage = Date.now();
 }
 const echecChauffage = e => console.log('[maj] chauffage en échec :', String(e.message).replace(/\n/g, ' '));
+// après une commande, l'état affiché est l'état attendu (optimiste) : on relit le vrai un peu plus tard
+function relireChauffage() {
+  setTimeout(() => majChauffage().catch(echecChauffage), 4000);
+  setTimeout(() => majChauffage().catch(echecChauffage), 30000); // la chaudière réagit plus lentement
+}
+function rafraichirEtat(topo) {
+  // pièces au programme : on affiche déjà la consigne du planning en cours (nouveau ou retouché)
+  if (chBrut && topo.programme) {
+    const rooms = Object.assign({}, chBrut.rooms);
+    topo.pieces.forEach(p => {
+      const r = rooms[p.id];
+      if (!r || (r.therm_setpoint_mode || 'schedule') !== 'schedule') return;
+      const pr = netatmo.programme(topo.programme, p.id, topo.tz, new Date(), true);
+      if (pr) rooms[p.id] = Object.assign({}, r, { therm_setpoint_temperature: pr.actif.temp });
+    });
+    chBrut = { rooms: rooms, mods: chBrut.mods };
+  }
+  if (chBrut) donnees.chauffage = etatChauffage(topo, chBrut);
+  else if (donnees.chauffage && donnees.chauffage.attente) donnees.chauffage.planning = apercuPlanning(topo);
+}
 
 // commandes depuis l'écran. netatmo applique en quelques secondes : on affiche tout de
 // suite l'état attendu (optimiste), puis on relit l'état réel.
+// piece : id netatmo de la pièce visée (consigne, programme) ; sans pièce, « programme » vaut pour toute la maison
 let chDerniereCommande = 0;
-async function commandeChauffage(action, valeur) {
+async function commandeChauffage(action, valeur, pieceId) {
   if (!chauffageActif()) throw new Error('chauffage non configuré');
   if (Date.now() - chDerniereCommande < 1000) throw new Error('commande trop rapprochée');
   chDerniereCommande = Date.now();
   const topo = await topoChauffage(false);
   const sch = topo.programme || {};
   const envoie = (chemin, params) => netatmo.appel(CFG.netatmo, JETON_NETATMO, chemin, Object.assign({ home_id: topo.homeId }, params), null, journalNetatmo);
-  const modeActuel = chBrut ? chBrut.room.therm_setpoint_mode : 'schedule';
-  let attendu;
+  const piece = pieceId ? topo.pieces.find(p => p.id === pieceId) : null;
+  if (pieceId && !piece) throw new Error('pièce inconnue');
+  const brut = id => (chBrut && chBrut.rooms[id]) || {};
+  const modeMaison = topo.pieces.some(p => /^(away|hg)$/.test(brut(p.id).therm_setpoint_mode || '')) ? 'hors' : 'schedule';
+  const attendu = {}; // id de pièce → champs attendus
+  const auProgramme = p => {
+    const pr = topo.programme ? netatmo.programme(topo.programme, p.id, topo.tz, new Date(), true) : null;
+    return { therm_setpoint_mode: 'schedule', therm_setpoint_temperature: pr ? pr.actif.temp : null, therm_setpoint_end_time: 0 };
+  };
   if (action === 'consigne') {
+    const p = piece || topo.pieces.find(x => x.id === topo.piece.id);
     if (!isFinite(valeur)) throw new Error('consigne invalide');
-    const t = Math.min(BORNES_CONSIGNE.max, Math.max(BORNES_CONSIGNE.min, Math.round(valeur * 2) / 2));
+    const b = bornesPiece(p);
+    const t = Math.min(b.max, Math.max(b.min, Math.round(valeur * 2) / 2));
     const fin = Math.floor(Date.now() / 1000) + topo.duree * 60;
-    await envoie('api/setroomthermpoint', { room_id: topo.piece.id, mode: 'manual', temp: t, endtime: fin });
-    attendu = { therm_setpoint_mode: 'manual', therm_setpoint_temperature: t, therm_setpoint_end_time: fin };
+    await envoie('api/setroomthermpoint', { room_id: p.id, mode: 'manual', temp: t, endtime: fin });
+    attendu[p.id] = { therm_setpoint_mode: 'manual', therm_setpoint_temperature: t, therm_setpoint_end_time: fin };
   } else if (action === 'programme') {
-    // absent et hors-gel se lèvent au niveau de la maison ; un réglage manuel, au niveau de la pièce
-    // en quittant absent ou hors-gel, on lève aussi un éventuel réglage manuel resté sur la pièce
-    if (modeActuel === 'away' || modeActuel === 'hg') await envoie('api/setthermmode', { mode: 'schedule' });
-    await envoie('api/setroomthermpoint', { room_id: topo.piece.id, mode: 'home' });
-    const p = topo.programme ? netatmo.programme(topo.programme, topo.piece.id, topo.tz, new Date()) : null;
-    attendu = { therm_setpoint_mode: 'schedule', therm_setpoint_temperature: p ? p.actif.temp : null, therm_setpoint_end_time: 0 };
+    // absent et hors-gel se lèvent au niveau de la maison ; un réglage manuel, au niveau de la pièce.
+    // sans pièce précise, toutes les pièces réglées à la main reviennent au programme ; en quittant
+    // absent ou hors-gel, on lève aussi un éventuel manuel resté sur la pièce du thermostat
+    if (modeMaison === 'hors') {
+      await envoie('api/setthermmode', { mode: 'schedule' });
+      topo.pieces.forEach(p => { attendu[p.id] = auProgramme(p); });
+    }
+    let cibles = piece ? [piece] : topo.pieces.filter(p => /^(manual|max)$/.test(brut(p.id).therm_setpoint_mode || ''));
+    if (!piece && modeMaison === 'hors' && !cibles.length) cibles = topo.pieces.filter(p => p.id === topo.piece.id);
+    for (const p of cibles) {
+      await envoie('api/setroomthermpoint', { room_id: p.id, mode: 'home' });
+      attendu[p.id] = auProgramme(p);
+    }
   } else if (action === 'absent') {
     await envoie('api/setthermmode', { mode: 'away' });
-    attendu = { therm_setpoint_mode: 'away', therm_setpoint_temperature: sch.away_temp, therm_setpoint_end_time: 0 };
+    topo.pieces.forEach(p => { attendu[p.id] = { therm_setpoint_mode: 'away', therm_setpoint_temperature: sch.away_temp, therm_setpoint_end_time: 0 }; });
   } else if (action === 'horsgel') {
     await envoie('api/setthermmode', { mode: 'hg' });
-    attendu = { therm_setpoint_mode: 'hg', therm_setpoint_temperature: sch.hg_temp, therm_setpoint_end_time: 0 };
+    topo.pieces.forEach(p => { attendu[p.id] = { therm_setpoint_mode: 'hg', therm_setpoint_temperature: sch.hg_temp, therm_setpoint_end_time: 0 }; });
   } else throw new Error('commande inconnue');
   if (chBrut) {
-    chBrut = { room: Object.assign({}, chBrut.room, attendu), mod: chBrut.mod };
-    donnees.chauffage = etatChauffage(topo, chBrut.room, chBrut.mod);
+    const rooms = Object.assign({}, chBrut.rooms);
+    Object.keys(attendu).forEach(id => { rooms[id] = Object.assign({}, rooms[id], attendu[id]); });
+    chBrut = { rooms: rooms, mods: chBrut.mods };
+    donnees.chauffage = etatChauffage(topo, chBrut);
   }
-  setTimeout(() => majChauffage().catch(echecChauffage), 4000);
-  setTimeout(() => majChauffage().catch(echecChauffage), 30000); // la chaudière réagit plus lentement
+  relireChauffage();
+  return donnees.chauffage;
+}
+
+/* ---------- programme maison : appliquer, retoucher, revenir à l'ancien planning ----------
+   appliquer crée le planning « Programme maison » dans netatmo (ou le met à jour s'il existe)
+   et l'active. le planning d'avant n'est jamais modifié : on peut y revenir d'un appui. */
+async function envoyerPlanning() {
+  const topo = await topoChauffage(true);
+  const comp = programme.compiler(chPlanning.def, topo.pieces, topo.programme);
+  if (comp.erreur) throw new ErreurEcran(comp.erreur);
+  const envoie = (chemin, params) => netatmo.appel(CFG.netatmo, JETON_NETATMO, chemin, Object.assign({ home_id: topo.homeId }, params), null, journalNetatmo);
+  const corps = {
+    home_id: topo.homeId, name: chPlanning.def.nom,
+    timetable: comp.timetable, zones: comp.zones, hg_temp: comp.hg_temp, away_temp: comp.away_temp,
+  };
+  const app = chPlanning.applique || {};
+  let id = app.scheduleId && topo.plannings.some(p => p.id === app.scheduleId) ? app.scheduleId : null;
+  if (!id) { const meme = topo.plannings.find(p => p.nom === chPlanning.def.nom); if (meme) id = meme.id; }
+  // le planning auquel on pourra revenir : celui en cours s'il n'est pas le nôtre, sinon celui noté la première fois
+  const enCours = topo.programme;
+  const precedent = enCours && enCours.id !== id ? { id: enCours.id, nom: enCours.name } : { id: app.precedentId, nom: app.precedentNom };
+  if (id) {
+    await netatmo.appelPlanning(CFG.netatmo, JETON_NETATMO, 'api/synchomeschedule', Object.assign({ schedule_id: id }, corps), journalNetatmo);
+  } else {
+    const r = await netatmo.appelPlanning(CFG.netatmo, JETON_NETATMO, 'api/createnewhomeschedule', corps, journalNetatmo);
+    id = (r.corps && (r.corps.schedule_id || r.corps.id)) || null;
+    if (!id) { const t = await topoChauffage(true); const m = t.plannings.find(p => p.nom === chPlanning.def.nom); if (m) id = m.id; }
+    if (!id) throw new Error('planning créé mais introuvable dans homesdata');
+  }
+  if (!(enCours && enCours.id === id)) await envoie('api/switchhomeschedule', { schedule_id: id });
+  chPlanning.applique = {
+    scheduleId: id, le: new Date().toISOString(), empreinte: empreinte(comp),
+    precedentId: precedent.id || null, precedentNom: precedent.nom || null,
+  };
+  chPlanningErreur = '';
+  sauverPlanning();
+  console.log('[chauffage] programme maison appliqué :', comp.nbZones, 'zones,', comp.nbCreneaux, 'créneaux');
+  return topoChauffage(true);
+}
+
+let chDerniereRetouche = 0;
+async function commandePlanning(action, q) {
+  if (!chauffageActif()) throw new Error('chauffage non configuré');
+  if (Date.now() - chDerniereRetouche < 1000) throw new Error('commande trop rapprochée');
+  chDerniereRetouche = Date.now();
+  let topo = await topoChauffage(false);
+  const etatAvant = apercuPlanning(topo).etat;
+  if (action === 'temp' || action === 'reveil' || action === 'origine') {
+    const sauve = programme.copie(chPlanning.def);
+    try {
+      if (action === 'temp') programme.changerTemp(chPlanning.def, q.get('g'), parseInt(q.get('i'), 10), parseFloat(q.get('t')));
+      else if (action === 'reveil') programme.changerReveil(chPlanning.def, q.get('j'), programme.minutes(q.get('h') || '', 0));
+      else chPlanning.def = programme.copie(programme.DEFAUT);
+      const err = programme.verifier(chPlanning.def);
+      if (err.length) throw new ErreurEcran(err[0]);
+      const comp = programme.compiler(chPlanning.def, topo.pieces, topo.programme);
+      if (comp.erreur) throw new ErreurEcran(comp.erreur);
+    } catch (e) { chPlanning.def = sauve; throw e instanceof ErreurEcran ? e : new ErreurEcran(e.message); }
+    chPlanning.modifie = action !== 'origine';
+    sauverPlanning();
+    // programme déjà en place : la retouche part tout de suite chez netatmo
+    if (etatAvant === 'actif' || etatAvant === 'modifie') {
+      try { topo = await envoyerPlanning(); } catch (e) {
+        chPlanningErreur = 'retouche gardée, mais netatmo ne l\'a pas encore reçue';
+        rafraichirEtat(topo);
+        throw e;
+      }
+    }
+  } else if (action === 'appliquer') {
+    try { topo = await envoyerPlanning(); } catch (e) {
+      if (!(e instanceof ErreurEcran)) chPlanningErreur = 'netatmo n\'a pas accepté le programme, rien n\'a changé';
+      rafraichirEtat(topo);
+      throw e;
+    }
+  } else if (action === 'ancien') {
+    const app = chPlanning.applique || {};
+    const autre = topo.plannings.find(p => p.id === app.precedentId) || topo.plannings.find(p => p.id !== app.scheduleId);
+    if (!autre) throw new ErreurEcran('aucun autre planning dans netatmo');
+    await netatmo.appel(CFG.netatmo, JETON_NETATMO, 'api/switchhomeschedule', { home_id: topo.homeId, schedule_id: autre.id }, null, journalNetatmo);
+    topo = await topoChauffage(true);
+  } else throw new Error('commande inconnue');
+  rafraichirEtat(topo);
+  relireChauffage();
   return donnees.chauffage;
 }
 
@@ -1257,19 +1519,32 @@ const serveur = http.createServer(async (req, res) => {
         soleil: donnees.meteo.soleil,
         meteoPrevisions: donnees.meteo.previsions,
         moment: momentDuJour(),
-        chauffage: chauffageActif() ? (donnees.chauffage || { attente: true }) : null,
+        chauffage: chauffageActif() ? (donnees.chauffage || { attente: true, planning: apercuPlanning(chTopo) }) : null,
       figees: sourcesFigees(),
       });
 
     } else if (/^\/chauffage\/(consigne|programme|absent|horsgel)$/.test(route)) {
-      // commandes du thermostat ; consigne : ?t=20.5 (degrés, pas de 0,5, bornée)
-      const m = req.url.match(/[?&]t=(-?\d+(?:\.\d+)?)/);
+      // commandes du chauffage ; consigne : ?t=20.5 (degrés, pas de 0,5, bornée) ;
+      // &piece=<id netatmo> pour viser une pièce (sinon la pièce du thermostat, ou toute la maison pour programme)
+      const q = new URLSearchParams(req.url.split('?')[1] || '');
       try {
-        const d = await commandeChauffage(route.slice('/chauffage/'.length), m ? parseFloat(m[1]) : NaN);
+        const d = await commandeChauffage(route.slice('/chauffage/'.length), q.has('t') ? parseFloat(q.get('t')) : NaN, q.get('piece') || null);
         json(res, { ok: true, chauffage: d });
       } catch (e) {
         console.log('[chauffage]', route.slice(1), 'refusé :', String(e.message).replace(/\n/g, ' '));
         json(res, { ok: false, erreur: e.message });
+      }
+
+    } else if (/^\/chauffage\/planning\/(appliquer|temp|reveil|ancien|origine)$/.test(route)) {
+      // programme maison : appliquer, retoucher une température (?g=groupe&i=plage&t=21.5, i=-1 la base),
+      // décaler un réveil (?j=semaine|weekend&h=07:45), revenir à l'ancien planning, ou au programme d'origine
+      const q = new URLSearchParams(req.url.split('?')[1] || '');
+      try {
+        const d = await commandePlanning(route.slice('/chauffage/planning/'.length), q);
+        json(res, { ok: true, chauffage: d });
+      } catch (e) {
+        console.log('[chauffage]', route.slice(1), 'refusé :', String(e.message).replace(/\n/g, ' '));
+        json(res, { ok: false, erreur: e.message, message: e instanceof ErreurEcran ? e.message : '', chauffage: donnees.chauffage });
       }
 
     } else if (route === '/agenda/epingle') {

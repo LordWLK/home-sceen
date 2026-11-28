@@ -212,6 +212,11 @@
   #vue-chauffage .ch-prog .it small { font-size:10.5px; letter-spacing:.16em; }
   #vue-chauffage .ch-prog .it.passe { opacity:.42; }
   #vue-chauffage .ch-prog .suspendu { opacity:.45; } /* absent ou hors-gel : le programme ne s'applique pas */
+  /* plus de 5 créneaux (salle de bain) : une ligne par créneau, le créneau en cours pointé à gauche */
+  #vue-chauffage #ch-prog.serre .it { padding:4px 0; font-size:15.5px; white-space:nowrap; }
+  #vue-chauffage #ch-prog.serre .it small { display:inline; margin-left:9px; font-size:10px; letter-spacing:.14em; }
+  #vue-chauffage #ch-prog.serre .it.next:after { display:none; }
+  #vue-chauffage #ch-prog.serre .it.next:before { content:''; display:inline-block; width:6px; height:6px; border-radius:50%; background:#b96f45; margin-right:9px; vertical-align:2px; }
   .nuit #vue-chauffage { background:#2e2d28; }
   .nuit #vue-chauffage .titre-ecran { color:#c98b60; }
   .nuit #vue-chauffage .bientot { color:#c98b60; }
@@ -219,6 +224,125 @@
   .nuit #vue-chauffage .modes span.on { color:#fff; background:#a05a34; }
   .nuit #vue-chauffage .ch-etat { color:#9b917d; }
   .nuit #vue-chauffage .ch-etat.erreur { color:#c98b60; }
+
+  /* ---------- chauffage pièce par pièce : une petite arche par pièce ---------- */
+  #vue-pieces { background:#f6f1e8; }
+  #vue-pieces .titre-ecran { color:#8a4a28; }
+  #vue-pieces .pc-etat { position:absolute; left:0; right:0; top:134px; text-align:center; font-family:Georgia,serif; font-style:italic; font-size:16px; color:#a2947c; }
+  #vue-pieces .pc-etat.erreur { color:#b96f45; }
+  #vue-pieces .modes { position:absolute; left:0; right:0; top:172px; text-align:center; }
+  #vue-pieces .modes span { display:inline-block; font-family:Georgia,serif; font-style:italic; font-size:17px; color:#a98a72; padding:6px 18px; margin:0 4px; border-radius:16px; }
+  #vue-pieces .modes span.on { color:#fff; background:#b96f45; }
+  /* lien vers le programme, en haut à droite (pendant du « ‹ accueil ») */
+  .lien-d { position:absolute; top:52px; right:64px; font-size:12px; font-weight:600; letter-spacing:.24em; text-transform:uppercase; color:#8a7d66; }
+  .lien-d:after { content:'\203A'; margin-left:9px; font-size:16px; }
+  .lien-d .a-faire { color:#b96f45; }
+  .lien-d .a-faire:before { content:''; display:inline-block; width:6px; height:6px; border-radius:50%; background:#b96f45; margin:0 7px 0 2px; vertical-align:2px; }
+  #vue-pieces .pc-grille { position:absolute; left:0; right:0; top:228px; text-align:center; font-size:0; }
+  #vue-pieces .pc-t {
+    display:inline-block; vertical-align:top; position:relative;
+    width:208px; height:234px; margin:0 9px 20px; padding:54px 14px 0;
+    border-radius:104px 104px 14px 14px; background:#ebe2d1; color:#4a463c; text-align:center;
+  }
+  #vue-pieces .pc-t:active { opacity:.82; }
+  #vue-pieces .pc-nom { font-family:Georgia,serif; font-style:italic; font-size:18px; line-height:1.15; height:21px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #vue-pieces .pc-temp { font-family:"Optima","Avenir Next",sans-serif; font-size:48px; font-weight:500; line-height:1; margin-top:12px; color:#33322b; }
+  #vue-pieces .pc-lig { margin-top:11px; font-size:10.5px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:#8a7d66; white-space:nowrap; }
+  #vue-pieces .pc-lig.main { color:#b96f45; }
+  #vue-pieces .pc-st { margin-top:7px; font-size:10.5px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:#a2947c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #vue-pieces .pc-st.fenetre { color:#75815f; }
+  #vue-pieces .pc-st .flamme { width:9px; height:9px; margin:0 8px 0 0; }
+  #vue-pieces .pc-alerte { margin-top:6px; font-size:9.5px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:#b96f45; }
+  #vue-pieces .pc-t.chauffe { background:#b96f45; color:#f6f1e8; }
+  #vue-pieces .pc-t.chauffe .pc-temp { color:#fff8ee; }
+  #vue-pieces .pc-t.chauffe .pc-lig, #vue-pieces .pc-t.chauffe .pc-st { color:#f4e9d2; }
+  #vue-pieces .pc-t.chauffe .pc-lig.main { color:#fff; }
+  #vue-pieces .pc-t.chauffe .pc-alerte { color:#fff; }
+  #vue-pieces .pc-t.perdue { opacity:.5; }
+  /* au-delà de 8 pièces : trois rangées plus basses */
+  #vue-pieces .pc-grille.serre .pc-t { height:158px; padding-top:30px; margin-bottom:14px; }
+  #vue-pieces .pc-grille.serre .pc-temp { font-size:34px; margin-top:6px; }
+  #vue-pieces .pc-grille.serre .pc-st, #vue-pieces .pc-grille.serre .pc-alerte { display:none; }
+  #vue-pieces .bientot { position:absolute; left:0; right:0; top:300px; text-align:center; font-family:Georgia,serif; font-style:italic; font-size:52px; color:#b96f45; }
+  #vue-pieces .explic { position:absolute; left:0; right:0; top:388px; text-align:center; font-size:13px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#a2947c; }
+  .nuit #vue-pieces { background:#2e2d28; }
+  .nuit #vue-pieces .titre-ecran { color:#c98b60; }
+  .nuit #vue-pieces .pc-etat { color:#9b917d; }
+  .nuit #vue-pieces .modes span { color:#9c8874; }
+  .nuit #vue-pieces .modes span.on { color:#fff; background:#a05a34; }
+  .nuit #vue-pieces .pc-t { background:#38362f; color:#d8d2c4; }
+  .nuit #vue-pieces .pc-temp { color:#e8e2d3; }
+  .nuit #vue-pieces .pc-lig { color:#a89e88; }
+  .nuit #vue-pieces .pc-st { color:#8a8171; }
+  .nuit #vue-pieces .pc-t.chauffe { background:#96593a; color:#e8ddd1; }
+  .nuit #vue-pieces .bientot { color:#c98b60; }
+  .nuit .lien-d { color:#9b917d; }
+
+  /* ---------- programme maison : une barre de 24 h par pièce ---------- */
+  #vue-programme { background:#f6f1e8; }
+  #vue-programme .titre-ecran { color:#8a4a28; }
+  #vue-programme .pg-etat { position:absolute; left:0; right:0; top:128px; text-align:center; font-family:Georgia,serif; font-style:italic; font-size:16px; color:#a2947c; }
+  #vue-programme .pg-etat.erreur { color:#b96f45; }
+  #vue-programme .pg-jours { position:absolute; left:0; right:0; top:164px; text-align:center; }
+  #vue-programme .pg-jours span { display:inline-block; font-family:Georgia,serif; font-style:italic; font-size:17px; color:#a98a72; padding:6px 18px; margin:0 4px; border-radius:16px; }
+  #vue-programme .pg-jours span.on { color:#fff; background:#b96f45; }
+  /* réveil du jour affiché : − 8 h + (par quart d'heure) */
+  #vue-programme .pg-reveil {
+    position:absolute; top:160px; right:58px; height:40px;
+    display:-webkit-flex; display:flex; -webkit-align-items:center; align-items:center;
+  }
+  #vue-programme .pg-reveil .lab { font-size:10.5px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:#a2947c; margin-right:12px; text-align:right; line-height:1.35; }
+  #vue-programme .pg-reveil .val { font-family:"Optima","Avenir Next",sans-serif; font-size:22px; font-weight:500; color:#33322b; width:72px; text-align:center; }
+  #vue-programme .pg-b { display:block; position:relative; width:38px; height:38px; border-radius:50%; border:1.5px solid #c9b79a; -webkit-flex:0 0 auto; flex:0 0 auto; }
+  #vue-programme .pg-b:active { background:#ebe2d1; }
+  #vue-programme .pg-b.ic-moins:before, #vue-programme .pg-b.ic-plus:before { left:11px; top:16px; width:14px; height:3px; background:#8a7d66; }
+  #vue-programme .pg-b.ic-plus:after { left:16px; top:11px; width:3px; height:14px; background:#8a7d66; }
+  #vue-programme .pg-echelle { position:absolute; left:262px; width:704px; top:220px; height:14px; }
+  #vue-programme .pg-echelle span { position:absolute; top:0; width:40px; margin-left:-20px; text-align:center; font-size:10.5px; font-weight:700; letter-spacing:.08em; color:#b3a78e; }
+  #vue-programme .pg-lignes { position:absolute; left:0; right:0; top:242px; }
+  #vue-programme .pg-l { position:relative; height:72px; }
+  #vue-programme .pg-g { position:absolute; left:24px; width:222px; top:6px; text-align:right; }
+  #vue-programme .pg-nom { font-family:Georgia,serif; font-style:italic; font-size:18px; color:#4a463c; line-height:1.15; }
+  #vue-programme .pg-qui { margin-top:4px; font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:#a2947c; line-height:1.35; }
+  #vue-programme .pg-qui.aucune { color:#c9b79a; }
+  #vue-programme .pg-barre { position:absolute; left:262px; width:704px; top:6px; height:46px; border-radius:23px; overflow:hidden; background:#efe8d8; }
+  #vue-programme .pg-s { position:absolute; top:0; bottom:0; text-align:center; line-height:46px; font-size:13px; font-weight:700; letter-spacing:.02em; overflow:hidden; white-space:nowrap; border-left:2px solid #f6f1e8; }
+  #vue-programme .pg-s.prem { border-left:0; }
+  #vue-programme .pg-s.sel { box-shadow:inset 0 0 0 3px #35342d; }
+  #vue-programme .pg-s.attente { opacity:.75; }
+  /* maintenant : un trait d'encre fin à travers les barres */
+  #vue-programme .pg-maint { position:absolute; top:236px; width:2px; margin-left:-1px; background:#35342d; opacity:.5; }
+  #vue-programme .pg-maint:before { content:''; position:absolute; left:-3px; top:-4px; width:8px; height:8px; border-radius:50%; background:#35342d; }
+  #vue-programme .pg-bas { position:absolute; left:0; right:0; top:618px; height:150px; text-align:center; }
+  #vue-programme .pg-act { display:inline-block; font-family:Georgia,serif; font-style:italic; font-size:21px; color:#fff; background:#b96f45; border-radius:24px; padding:11px 34px; margin-top:10px; }
+  #vue-programme .pg-act:active { background:#a05a34; }
+  #vue-programme .pg-act.occupe { opacity:.6; }
+  #vue-programme .pg-explic { margin-top:14px; font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#a2947c; line-height:1.5; }
+  #vue-programme .pg-explic.erreur { color:#b96f45; }
+  #vue-programme .pg-lien { display:inline-block; margin-top:12px; font-family:Georgia,serif; font-style:italic; font-size:16px; color:#8a7d66; border-bottom:1px solid #d6c9b2; padding-bottom:1px; }
+  #vue-programme .pg-sep { display:inline-block; margin:0 14px; color:#c9b79a; }
+  #vue-programme .pg-ed { display:-webkit-flex; display:flex; -webkit-align-items:center; align-items:center; -webkit-justify-content:center; justify-content:center; margin-top:8px; }
+  #vue-programme .pg-ed .txt { text-align:right; margin-right:30px; }
+  #vue-programme .pg-ed .q { font-family:Georgia,serif; font-style:italic; font-size:20px; color:#4a463c; }
+  #vue-programme .pg-ed .s { margin-top:5px; font-size:10.5px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:#a2947c; }
+  #vue-programme .pg-ed .v { font-family:"Optima","Avenir Next",sans-serif; font-size:40px; font-weight:500; color:#33322b; width:118px; text-align:center; line-height:1; }
+  #vue-programme .pg-ed .v small { display:block; font-family:"Avenir Next","Helvetica Neue",sans-serif; font-size:10px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; color:#a2947c; margin-bottom:6px; }
+  #vue-programme .pg-ed .pg-b { width:52px; height:52px; }
+  #vue-programme .pg-ed .pg-b.ic-moins:before, #vue-programme .pg-ed .pg-b.ic-plus:before { left:17px; top:23px; width:18px; height:4px; }
+  #vue-programme .pg-ed .pg-b.ic-plus:after { left:24px; top:16px; width:4px; height:18px; }
+  #vue-programme .pg-ed .ok { margin-left:30px; font-family:Georgia,serif; font-style:italic; font-size:17px; color:#8a7d66; padding:8px 18px; border:1.5px solid #d6c9b2; border-radius:18px; }
+  .nuit #vue-programme { background:#2e2d28; }
+  .nuit #vue-programme .titre-ecran { color:#c98b60; }
+  .nuit #vue-programme .pg-etat { color:#9b917d; }
+  .nuit #vue-programme .pg-jours span { color:#9c8874; }
+  .nuit #vue-programme .pg-jours span.on { color:#fff; background:#a05a34; }
+  .nuit #vue-programme .pg-nom { color:#d8d2c4; }
+  .nuit #vue-programme .pg-barre { background:#38362f; }
+  .nuit #vue-programme .pg-s { border-left-color:#2e2d28; opacity:.72; }
+  .nuit #vue-programme .pg-maint, .nuit #vue-programme .pg-maint:before { background:#e8e2d3; }
+  .nuit #vue-programme .pg-reveil .val, .nuit #vue-programme .pg-ed .v { color:#e8e2d3; }
+  .nuit #vue-programme .pg-ed .q { color:#d8d2c4; }
+  .nuit #vue-programme .pg-act { background:#a05a34; }
   /* flamme dessinée en css : goutte pointe en haut, cœur ambré (chaudière en chauffe) */
   .flamme { display:inline-block; position:relative; width:11px; height:11px; margin-right:10px; background:#f4e9d2; border-radius:0 50% 50% 50%; -webkit-transform:rotate(45deg); transform:rotate(45deg); }
   .flamme:after { content:''; position:absolute; right:1px; bottom:1px; width:5px; height:5px; background:#e0975e; border-radius:0 50% 50% 50%; }
@@ -760,14 +884,49 @@
     <div class="cols" id="pv-cols"></div>
   </div>
 
-  <div class="vue" id="vue-chauffage" style="display:none">
+  <div class="vue" id="vue-pieces" style="display:none">
     <div class="retour" onclick="montrer('vue-principal')">accueil</div>
+    <div class="lien-d" id="pc-lien" onclick="return ouvrirProgramme()">programme</div>
     <div class="titre-ecran">chauffage</div>
+    <div class="pc-etat" id="pc-etat" style="display:none"></div>
+    <div class="modes" id="pc-modes" style="display:none">
+      <span id="pc-m-programme" onclick="return chMode('programme', null)">programme</span>
+      <span id="pc-m-absent" onclick="return chMode('absent', null)">absent</span>
+      <span id="pc-m-horsgel" onclick="return chMode('horsgel', null)">hors-gel</span>
+    </div>
+    <div class="pc-grille" id="pc-grille"></div>
+    <div class="bientot" id="pc-attente">bientôt</div>
+    <div class="explic" id="pc-explic">la chaudière et les thermostats se brancheront ici</div>
+  </div>
+
+  <div class="vue" id="vue-programme" style="display:none">
+    <div class="retour" onclick="return ouvrirPieces()">pièces</div>
+    <div class="titre-ecran">programme</div>
+    <div class="pg-etat" id="pg-etat"></div>
+    <div class="pg-jours" id="pg-jours">
+      <span id="pg-j-semaine" onclick="return pgChoixJour('semaine')">en semaine</span>
+      <span id="pg-j-weekend" onclick="return pgChoixJour('weekend')">le week-end</span>
+    </div>
+    <div class="pg-reveil" id="pg-reveil">
+      <div class="lab" id="pg-rv-lab">réveil</div>
+      <a href="#" class="pg-b ic-moins" onclick="return pgReveil(-1)" aria-label="réveil plus tôt"></a>
+      <div class="val" id="pg-rv-val"></div>
+      <a href="#" class="pg-b ic-plus" onclick="return pgReveil(1)" aria-label="réveil plus tard"></a>
+    </div>
+    <div class="pg-echelle" id="pg-echelle"></div>
+    <div class="pg-lignes" id="pg-lignes"></div>
+    <div class="pg-maint" id="pg-maint" style="display:none"></div>
+    <div class="pg-bas" id="pg-bas"></div>
+  </div>
+
+  <div class="vue" id="vue-chauffage" style="display:none">
+    <div class="retour" onclick="return ouvrirPieces()">pièces</div>
+    <div class="titre-ecran" id="ch-titre">chauffage</div>
     <div class="ch-etat" id="ch-etat" style="display:none"></div>
     <div class="modes" id="ch-modes" style="display:none">
-      <span id="ch-m-programme" onclick="return chMode('programme')">programme</span>
-      <span id="ch-m-absent" onclick="return chMode('absent')">absent</span>
-      <span id="ch-m-horsgel" onclick="return chMode('horsgel')">hors-gel</span>
+      <span id="ch-m-programme" onclick="return chMode('programme', chSel)">programme</span>
+      <span id="ch-m-absent" onclick="return chMode('absent', chSel)">absent</span>
+      <span id="ch-m-horsgel" onclick="return chMode('horsgel', chSel)">hors-gel</span>
     </div>
     <div class="arches" id="ch-arches" style="display:none">
       <div class="arch olive ch-dehors"><h3>dehors</h3><div id="ch-dehors"></div></div>
@@ -1090,26 +1249,78 @@
     pvSous();
     return false;
   }
-  // ---- écran chauffage (thermostat netatmo) : données de /contenu, commandes en xhr ----
+  // ---- chauffage (thermostat et vannes netatmo) : données de /contenu, commandes en xhr ----
+  // trois écrans : les pièces (une petite arche chacune), le détail d'une pièce (trois arches
+  // comme l'accueil) et le programme maison (une barre de 24 h par pièce).
   // les appuis −/+ se cumulent et partent en un seul envoi 1,5 s après le dernier
-  var chData = null, chActif = false, chDehors = null, chDemain = null;
-  var chPending = null, chTimer = null, chBusy = false, chErreurJusqua = 0;
+  var chData = null, chActif = false, chDehors = null, chDemain = null, chSel = null;
+  var chPending = null, chPendingPiece = null, chTimer = null, chBusy = false;
+  var chErreurJusqua = 0, chErreurMsg = '';
   function chEl(id) { return document.getElementById(id); }
   function chEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
   function chFmt(t) { return String(Math.round(t * 10) / 10).replace('.', ',') + '°'; }
   function chBase(m) { return m === 'away' ? 'absent' : (m === 'hg' ? 'horsgel' : 'programme'); }
+  function chOk() { return !!(chData && !chData.attente); }
+  function chEnErreur() { return new Date().getTime() < chErreurJusqua; }
+  // la pièce du détail : celle touchée, sinon celle du thermostat
+  function chPiece() {
+    var ps = (chData && chData.pieces) || [], i;
+    for (i = 0; i < ps.length; i++) { if (ps[i].id === chSel) { return ps[i]; } }
+    for (i = 0; i < ps.length; i++) { if (ps[i].id === chData.pieceId) { return ps[i]; } }
+    return ps[0] || chData;
+  }
+  function chAttente(prefixe) {
+    chEl(prefixe + '-attente').innerHTML = chActif ? 'un instant' : 'bientôt';
+    chEl(prefixe + '-explic').innerHTML = chActif ? 'lecture du thermostat en cours' : 'la chaudière et les thermostats se brancheront ici';
+  }
+  // seul l'écran affiché est redessiné
+  function chRenderTout() {
+    if (vueActive === 'vue-pieces') { pcRender(); }
+    else if (vueActive === 'vue-chauffage') { chRender(); }
+    else if (vueActive === 'vue-programme') { pgRender(); }
+  }
+
+  // ---- les pièces ----
+  function pcLien() {
+    var pl = chData && chData.planning, afaire = pl && (pl.etat === 'brouillon' || pl.etat === 'modifie' || pl.etat === 'inactif');
+    chEl('pc-lien').innerHTML = 'programme' + (afaire ? '<span class="a-faire">à appliquer</span>' : '');
+  }
+  function pcRender() {
+    var ok = chOk(), i, ids = ['pc-etat', 'pc-modes', 'pc-grille'];
+    for (i = 0; i < ids.length; i++) { chEl(ids[i]).style.display = ok ? '' : 'none'; }
+    chEl('pc-attente').style.display = ok ? 'none' : '';
+    chEl('pc-explic').style.display = ok ? 'none' : '';
+    pcLien();
+    if (!ok) { chAttente('pc'); return; }
+    var m = chData.maison || { mode: chData.mode, etat: chData.etat }, base = chBase(m.mode), modes = ['programme', 'absent', 'horsgel'];
+    chEl('pc-etat').innerHTML = chEsc(chEnErreur() ? chErreurMsg : m.etat);
+    chEl('pc-etat').className = 'pc-etat' + (chEnErreur() ? ' erreur' : '');
+    for (i = 0; i < modes.length; i++) { chEl('pc-m-' + modes[i]).className = modes[i] === base ? 'on' : ''; }
+    var ps = chData.pieces || [], h = '';
+    for (i = 0; i < ps.length; i++) {
+      var p = ps[i];
+      h += '<div class="pc-t' + (p.chauffe ? ' chauffe' : '') + (p.joignable === false ? ' perdue' : '') + '" onclick="return ouvrirPiece(' + i + ')">' +
+        '<div class="pc-nom">' + chEsc(p.court) + '</div>' +
+        '<div class="pc-temp">' + chEsc(p.mesureTxt) + '</div>' +
+        '<div class="pc-lig' + (p.mode === 'manual' || p.mode === 'max' ? ' main' : '') + '">' + chEsc(p.ligne) + '</div>' +
+        '<div class="pc-st' + (p.fenetre ? ' fenetre' : '') + '">' + (p.chauffe ? '<i class="flamme"></i>' : '') + chEsc(p.statut) + '</div>' +
+        (p.piles ? '<div class="pc-alerte">piles faibles</div>' : '') + '</div>';
+    }
+    chEl('pc-grille').className = 'pc-grille' + (ps.length > 8 ? ' serre' : '');
+    chEl('pc-grille').innerHTML = h;
+  }
+
+  // ---- le détail d'une pièce : dehors, la pièce, son programme du jour ----
   function chRender() {
-    var ok = !!(chData && !chData.attente), i, ids = ['ch-etat', 'ch-modes', 'ch-arches'];
+    var ok = chOk(), i, ids = ['ch-etat', 'ch-modes', 'ch-arches'];
     for (i = 0; i < ids.length; i++) { chEl(ids[i]).style.display = ok ? '' : 'none'; }
     chEl('ch-attente').style.display = ok ? 'none' : '';
     chEl('ch-explic').style.display = ok ? 'none' : '';
-    if (!ok) {
-      chEl('ch-attente').innerHTML = chActif ? 'un instant' : 'bientôt';
-      chEl('ch-explic').innerHTML = chActif ? 'lecture du thermostat en cours' : 'la chaudière et les thermostats se brancheront ici';
-      return;
-    }
-    var d = chData, base = chBase(d.mode), modes = ['programme', 'absent', 'horsgel'];
-    if (new Date().getTime() >= chErreurJusqua) { chEl('ch-etat').innerHTML = chEsc(d.etat); chEl('ch-etat').className = 'ch-etat'; }
+    if (!ok) { chAttente('ch'); return; }
+    var d = chPiece(), base = chBase(d.mode), modes = ['programme', 'absent', 'horsgel'];
+    chEl('ch-titre').innerHTML = chEsc(d.court || 'chauffage');
+    chEl('ch-etat').innerHTML = chEsc(chEnErreur() ? chErreurMsg : d.etat);
+    chEl('ch-etat').className = 'ch-etat' + (chEnErreur() ? ' erreur' : '');
     for (i = 0; i < modes.length; i++) { chEl('ch-m-' + modes[i]).className = modes[i] === base ? 'on' : ''; }
     chEl('ch-dehors').innerHTML = chDehors
       ? '<div class="ch-temp">' + chEsc(chDehors.temp) + '</div><div class="it">' + chEsc(chDehors.libelle) + '<small>' + chEsc(chDehors.minmax) + '</small></div>'
@@ -1123,10 +1334,10 @@
     var h = '', p = d.programme || [];
     for (i = 0; i < p.length; i++) {
       h += '<div class="it' + (p[i].etat === 'passe' ? ' passe' : (p[i].etat === 'en-cours' ? ' next' : '')) + '">' +
-        chEsc(p[i].nom) + ' · ' + chEsc(p[i].temp) + '<small>' + chEsc(p[i].quand) + '</small></div>';
+        chEsc(p[i].temp) + '<small>' + chEsc(p[i].quand) + '</small></div>';
     }
     chEl('ch-prog').innerHTML = h;
-    chEl('ch-prog').className = base === 'programme' ? '' : 'suspendu';
+    chEl('ch-prog').className = (base === 'programme' ? '' : 'suspendu') + (p.length > 5 ? ' serre' : '');
   }
   // menu météo & maison : carte chauffage allumée, « demain » sur la carte des prévisions
   function chCartes() {
@@ -1135,30 +1346,34 @@
         '</div><div class="cs">demain · ' + chEsc(chDemain.libelle) + '</div>';
     }
     var c = chEl('carte-chauf');
-    if (chData && !chData.attente) {
+    if (chOk()) {
+      var n = chData.maison ? chData.maison.chauffent : (chData.chauffe ? 1 : 0);
       c.className = 'carte chauf on';
       c.innerHTML = '<div class="ct">chauffage</div><div class="cv">' + chEsc(chData.mesureTxt) + '</div><div class="cs">' +
-        (chData.chauffe ? '<i class="flamme"></i>' : '') + 'consigne ' + chEsc(chData.consigneTxt) + '</div>';
+        (n ? '<i class="flamme"></i>' + n + (n > 1 ? ' pièces chauffent' : ' pièce chauffe') : 'tout est au chaud') + '</div>';
     } else {
       c.className = 'carte chauf' + (chActif ? ' on' : '');
       c.innerHTML = '<div class="ct">chauffage</div><div class="cs">' + (chActif ? 'lecture en cours' : 'bientôt') + '</div>';
     }
   }
+  function chLibre() { return !chBusy && chPending === null && pgPending === null && pgRvPending === null; }
   function chContenu(d) {
     if (!d.hasOwnProperty('chauffage')) { return; }
     chActif = d.chauffage !== null;
     if (d.dehors) { chDehors = d.dehors; }
     if (d.demain) { chDemain = d.demain; }
     // pendant un réglage en cours, on ne laisse pas le poll écraser la valeur affichée
-    if (!chBusy && chPending === null) { chData = d.chauffage; }
+    if (chLibre()) { chData = d.chauffage; chRenderTout(); }
     chCartes();
-    if (vueActive === 'vue-chauffage' && !chBusy && chPending === null) { chRender(); }
   }
   function chPas(sens) {
-    if (!chData || chData.attente || chBusy || chBase(chData.mode) !== 'programme') { return false; }
-    var b = chData.bornes || { min: 15, max: 23, pas: 0.5 };
-    var depart = chPending !== null ? chPending : (typeof chData.consigne === 'number' ? chData.consigne : 19);
+    if (!chOk() || chBusy) { return false; }
+    var d = chPiece();
+    if (chBase(d.mode) !== 'programme') { return false; }
+    var b = d.bornes || { min: 15, max: 23, pas: 0.5 };
+    var depart = chPending !== null ? chPending : (typeof d.consigne === 'number' ? d.consigne : 19);
     chPending = Math.min(b.max, Math.max(b.min, Math.round((depart + sens * b.pas) * 2) / 2));
+    chPendingPiece = d.id;
     chRender();
     if (chTimer) { clearTimeout(chTimer); }
     chTimer = setTimeout(chEnvoi, 1500);
@@ -1167,21 +1382,36 @@
   function chEnvoi() {
     chTimer = null;
     if (chPending === null) { return; }
-    if (chData && chPending === chData.consigne) { chPending = null; chRender(); return; } // revenu au point de départ
-    chCommande('consigne?t=' + chPending);
+    var d = chPiece();
+    if (d.id === chPendingPiece && chPending === d.consigne) { chPending = null; chRender(); return; } // revenu au point de départ
+    chCommande('consigne?t=' + chPending + (chPendingPiece ? '&piece=' + encodeURIComponent(chPendingPiece) : ''));
   }
-  function chMode(m) {
-    if (!chData || chData.attente || chBusy) { return false; }
+  // un réglage en attente part tout de suite quand on change d'écran
+  function chFlush() {
+    if (chTimer) { clearTimeout(chTimer); chEnvoi(); }
+    if (pgTimer) { clearTimeout(pgTimer); pgEnvoi(); }
+    if (pgRvTimer) { clearTimeout(pgRvTimer); pgRvEnvoi(); }
+  }
+  // piece : la pièce du détail (son « programme » annule son réglage à la main) ; null : toute la maison
+  function chMode(m, piece) {
+    if (!chOk() || chBusy) { return false; }
     if (chTimer) { clearTimeout(chTimer); chTimer = null; }
     chPending = null;
-    // déjà dans ce mode ; sauf « programme » pendant un réglage à la main, qu'il annule
-    if (m === chBase(chData.mode) && !(m === 'programme' && (chData.mode === 'manual' || chData.mode === 'max'))) { chRender(); return false; }
-    chCommande(m);
+    if (piece) {
+      var d = chPiece();
+      // déjà dans ce mode ; sauf « programme » pendant un réglage à la main, qu'il annule
+      if (m === chBase(d.mode) && !(m === 'programme' && (d.mode === 'manual' || d.mode === 'max'))) { chRender(); return false; }
+      chCommande(m + (m === 'programme' && d.id ? '?piece=' + encodeURIComponent(d.id) : ''));
+    } else {
+      var mm = chData.maison || { mode: chData.mode, aLaMain: 0 };
+      if (m === chBase(mm.mode) && !(m === 'programme' && mm.aLaMain)) { pcRender(); return false; }
+      chCommande(m);
+    }
     return false;
   }
   function chCommande(chemin) {
     chBusy = true;
-    chRender();
+    chRenderTout();
     var x = new XMLHttpRequest();
     x.open('GET', 'chauffage/' + chemin + (chemin.indexOf('?') < 0 ? '?' : '&') + '_=' + new Date().getTime(), true);
     x.onreadystatechange = function () {
@@ -1190,21 +1420,213 @@
       try { r = JSON.parse(x.responseText); } catch (e) {}
       chBusy = false;
       chPending = null;
-      if (r && r.ok && r.chauffage) {
-        chData = r.chauffage;
-      } else {
+      pgPending = null;
+      pgRvPending = null;
+      if (r && r.chauffage) { chData = r.chauffage; }
+      if (!(r && r.ok)) {
         chErreurJusqua = new Date().getTime() + 6000;
-        chEl('ch-etat').innerHTML = 'le thermostat n\'a pas répondu, réessaie dans un instant';
-        chEl('ch-etat').className = 'ch-etat erreur';
-        setTimeout(function () { if (vueActive === 'vue-chauffage') { chRender(); } }, 6100);
+        chErreurMsg = (r && r.message) || 'le thermostat n\'a pas répondu, réessaie dans un instant';
+        setTimeout(chRenderTout, 6100);
       }
-      chRender();
+      chRenderTout();
       chCartes();
       setTimeout(pollContenu, 4500); // le serveur relit le vrai état 4 s après la commande
     };
     x.send();
   }
-  function ouvrirChauffage() { montrer('vue-chauffage'); chRender(); return false; }
+  function ouvrirPieces() { chFlush(); montrer('vue-pieces'); pcRender(); return false; }
+  function ouvrirChauffage() { return ouvrirPieces(); }
+  function ouvrirPiece(i) {
+    var ps = (chData && chData.pieces) || [];
+    if (!ps[i]) { return false; }
+    chFlush();
+    chSel = ps[i].id;
+    montrer('vue-chauffage');
+    chRender();
+    return false;
+  }
+
+  // ---- programme maison : une barre de 24 h par pièce, semaine ou week-end ----
+  // toucher une plage l'ouvre en réglage (−/+) ; la retouche vaut en semaine et le week-end
+  var pgJour = 'semaine', pgSel = null, pgPending = null, pgTimer = null;
+  var pgRvPending = null, pgRvJour = 'semaine', pgRvTimer = null;
+  var PG_W = 704, PG_X = 262, PG_H = 72;
+  // teinte d'une température : du sable pâle (froid) au terracotta profond (25°)
+  var PG_TEINTES = [[16, 236, 228, 212], [17, 230, 218, 196], [18, 221, 200, 169], [19, 214, 180, 143], [20, 204, 158, 118],
+    [21, 196, 135, 94], [22, 189, 122, 82], [23, 185, 111, 69], [25, 150, 82, 47]];
+  function pgTeinte(t) {
+    var a = PG_TEINTES, i, k = a[a.length - 1], f;
+    if (t <= a[0][0]) { k = a[0]; return 'rgb(' + k[1] + ',' + k[2] + ',' + k[3] + ')'; }
+    for (i = 1; i < a.length; i++) {
+      if (t <= a[i][0]) {
+        f = (t - a[i - 1][0]) / (a[i][0] - a[i - 1][0]);
+        return 'rgb(' + Math.round(a[i - 1][1] + f * (a[i][1] - a[i - 1][1])) + ',' +
+          Math.round(a[i - 1][2] + f * (a[i][2] - a[i - 1][2])) + ',' + Math.round(a[i - 1][3] + f * (a[i][3] - a[i - 1][3])) + ')';
+      }
+    }
+    return 'rgb(' + k[1] + ',' + k[2] + ',' + k[3] + ')';
+  }
+  function pgEncre(t) { return t >= 22 ? '#fff8ee' : '#4f4535'; }
+  function pgHm(mn) { var h = Math.floor(mn / 60), m = mn % 60; return h + ' h' + (m ? ' ' + pad(m) : ''); }
+  function pgSegs(g) { return pgJour === 'weekend' ? g.weekend : g.semaine; }
+  function pgTempSel(pl) {
+    var g = pl.groupes[pgSel.g], l = g.semaine.concat(g.weekend), k;
+    for (k = 0; k < l.length; k++) { if (l[k].i === pgSel.i) { return l[k].t; } }
+    return g.base;
+  }
+  // plages horaires d'une plage dans la journée affichée, la nuit recollée (21 h à 7 h)
+  function pgQuand(g) {
+    var s = pgSegs(g), r = [], k, txt = [];
+    for (k = 0; k < s.length; k++) { if (s[k].i === pgSel.i) { r.push(s[k]); } }
+    if (!r.length) { return pgJour === 'weekend' ? 'pas le week-end' : 'pas en semaine'; }
+    if (r.length > 1 && r[0].de === 0 && r[r.length - 1].a === 1440) {
+      r[r.length - 1] = { deTxt: r[r.length - 1].deTxt, aTxt: r[0].aTxt };
+      r.shift();
+    }
+    for (k = 0; k < r.length; k++) { txt.push(r[k].deTxt + ' à ' + r[k].aTxt); }
+    return txt.join(' et ');
+  }
+  function pgLigne(pl) {
+    if (pl.etat === 'actif' && pl.differe) { return 'en place, mais retouché depuis dans l\'appli netatmo'; }
+    if (pl.etat === 'actif') { return 'en place dans netatmo · planning « ' + String(pl.nom).toLowerCase() + ' »'; }
+    if (pl.etat === 'inactif') { return 'prêt, mais netatmo suit « ' + String(pl.enCours).toLowerCase() + ' »'; }
+    if (pl.etat === 'modifie') { return 'modifié depuis son envoi à netatmo'; }
+    if (pl.etat === 'indisponible') { return 'lecture du thermostat en cours'; }
+    return 'préparé pour toi, pas encore envoyé à netatmo';
+  }
+  function pgEchelle() {
+    var h = '', k;
+    for (k = 0; k <= 24; k += 3) { h += '<span style="left:' + Math.round(k / 24 * PG_W) + 'px">' + k + ' h</span>'; }
+    chEl('pg-echelle').innerHTML = h;
+  }
+  function pgRender() {
+    var pl = chData && chData.planning, i, j;
+    if (!pl) {
+      chEl('pg-etat').innerHTML = chActif ? 'lecture du thermostat en cours' : 'la chaudière et les thermostats se brancheront ici';
+      chEl('pg-lignes').innerHTML = ''; chEl('pg-bas').innerHTML = ''; chEl('pg-maint').style.display = 'none';
+      chEl('pg-reveil').style.display = 'none';
+      return;
+    }
+    chEl('pg-reveil').style.display = '';
+    chEl('pg-etat').innerHTML = chEsc(chEnErreur() ? chErreurMsg : pgLigne(pl));
+    chEl('pg-etat').className = 'pg-etat' + (chEnErreur() ? ' erreur' : '');
+    chEl('pg-j-semaine').className = pgJour === 'semaine' ? 'on' : '';
+    chEl('pg-j-weekend').className = pgJour === 'weekend' ? 'on' : '';
+    var rv = pgRvPending !== null && pgRvJour === pgJour ? pgRvPending : (pgJour === 'weekend' ? pl.reveil.weekend : pl.reveil.semaine);
+    chEl('pg-rv-val').innerHTML = pgHm(rv);
+    chEl('pg-rv-lab').innerHTML = pgRvPending !== null ? (chBusy ? 'envoi' : 'réglage') : 'réveil<br>chauffe dès ' + pgHm(rv - 60);
+    var h = '';
+    for (i = 0; i < pl.groupes.length; i++) {
+      var g = pl.groupes[i], segs = pgSegs(g);
+      h += '<div class="pg-l"><div class="pg-g"><div class="pg-nom">' + chEsc(g.nom) + '</div><div class="pg-qui' + (g.pieces.length ? '' : ' aucune') + '">' +
+        (g.pieces.length ? chEsc(g.detail || g.pieces.join(' · ').toLowerCase()) : 'aucune pièce trouvée') + '</div></div><div class="pg-barre">';
+      for (j = 0; j < segs.length; j++) {
+        var s = segs[j], sel = !!(pgSel && pgSel.g === i && pgSel.i === s.i);
+        var t = sel && pgPending !== null ? pgPending : s.t;
+        var x = Math.round(s.de / 1440 * PG_W), w = Math.round(s.a / 1440 * PG_W) - x;
+        h += '<div class="pg-s' + (j === 0 ? ' prem' : '') + (sel ? ' sel' : '') + (sel && pgPending !== null ? ' attente' : '') +
+          '" style="left:' + x + 'px;width:' + w + 'px;background:' + pgTeinte(t) + ';color:' + pgEncre(t) +
+          '" onclick="return pgTouche(' + i + ',' + s.i + ')">' + (w >= 40 ? chFmt(t) : '') + '</div>';
+      }
+      h += '</div></div>';
+    }
+    chEl('pg-lignes').innerHTML = h;
+    // maintenant : seulement si la journée affichée est celle d'aujourd'hui
+    var d = new Date(), we = d.getDay() === 0 || d.getDay() === 6, mk = chEl('pg-maint');
+    if ((pgJour === 'weekend') === we) {
+      mk.style.left = (PG_X + Math.round((d.getHours() * 60 + d.getMinutes()) / 1440 * PG_W)) + 'px';
+      mk.style.height = (pl.groupes.length * PG_H + 4) + 'px';
+      mk.style.display = 'block';
+    } else { mk.style.display = 'none'; }
+    chEl('pg-bas').innerHTML = pgSel ? pgEditeur(pl) : pgAction(pl);
+  }
+  function pgEditeur(pl) {
+    var g = pl.groupes[pgSel.g], t = pgPending !== null ? pgPending : pgTempSel(pl);
+    return '<div class="pg-ed"><div class="txt"><div class="q">' + chEsc(g.nom) + ' · ' + chEsc(pgQuand(g)) + '</div>' +
+      '<div class="s">' + (pl.etat === 'actif' || pl.etat === 'modifie' ? 'part tout de suite chez netatmo' : 'partira quand tu appliqueras') + ' · semaine et week-end</div></div>' +
+      '<a href="#" class="pg-b ic-moins" onclick="return pgPas(-1)" aria-label="moins chaud"></a>' +
+      '<div class="v"><small>' + (chBusy ? 'envoi' : (pgPending !== null ? 'réglage' : 'température')) + '</small>' + chFmt(t) + '</div>' +
+      '<a href="#" class="pg-b ic-plus" onclick="return pgPas(1)" aria-label="plus chaud"></a>' +
+      '<div class="ok" onclick="return pgFermer()">ok</div></div>';
+  }
+  function pgAction(pl) {
+    var e = pl.etat, h;
+    if (pl.erreur) { return '<div class="pg-explic erreur">' + chEsc(pl.erreur) + '</div>'; }
+    if (e === 'indisponible') { return '<div class="pg-explic">le programme s\'enverra quand le thermostat répondra</div>'; }
+    if (e === 'actif') {
+      h = '<div class="pg-explic">touche une plage pour changer sa température' + (pl.appliqueLe ? '<br>envoyé ' + chEsc(pl.appliqueLe) : '') + '</div>';
+      if (pl.precedent) { h += '<div class="pg-lien" onclick="return pgAncien()">revenir à « ' + chEsc(String(pl.precedent).toLowerCase()) + ' »</div>'; }
+      if (pl.retouche) { h += (pl.precedent ? '<span class="pg-sep">·</span>' : '') + '<div class="pg-lien" onclick="return pgOrigine()">reprendre le programme d\'origine</div>'; }
+      return h;
+    }
+    var lib = e === 'inactif' ? 'remettre ce programme' : (e === 'modifie' ? 'envoyer les changements' : 'appliquer ce programme');
+    var sous = pl.erreurEnvoi || (e === 'brouillon' ? 'crée le planning « ' + String(pl.nom).toLowerCase() + ' » dans netatmo et l\'active<br>ton planning actuel reste disponible'
+      : (e === 'inactif' ? 'le planning en cours reste disponible' : 'le programme a changé depuis son envoi'));
+    return '<div class="pg-act' + (chBusy ? ' occupe' : '') + '" onclick="return pgAppliquer()">' + (chBusy ? 'envoi à netatmo' : lib) + '</div>' +
+      '<div class="pg-explic' + (pl.erreurEnvoi ? ' erreur' : '') + '">' + (pl.erreurEnvoi ? chEsc(sous) : sous) + '</div>';
+  }
+  function pgTouche(gi, i) {
+    if (chBusy) { return false; }
+    if (pgTimer) { clearTimeout(pgTimer); pgEnvoi(); }
+    pgSel = pgSel && pgSel.g === gi && pgSel.i === i ? null : { g: gi, i: i };
+    pgRender();
+    return false;
+  }
+  function pgFermer() { if (pgTimer) { clearTimeout(pgTimer); pgEnvoi(); } pgSel = null; pgRender(); return false; }
+  function pgPas(sens) {
+    if (!pgSel || chBusy || !chData || !chData.planning) { return false; }
+    var pl = chData.planning, b = pl.bornes || { min: 12, max: 28, pas: 0.5 };
+    var depart = pgPending !== null ? pgPending : pgTempSel(pl);
+    pgPending = Math.min(b.max, Math.max(b.min, Math.round((depart + sens * b.pas) * 2) / 2));
+    pgRender();
+    if (pgTimer) { clearTimeout(pgTimer); }
+    pgTimer = setTimeout(pgEnvoi, 1500);
+    return false;
+  }
+  function pgEnvoi() {
+    pgTimer = null;
+    if (pgPending === null || !pgSel || !chData || !chData.planning) { pgPending = null; return; }
+    var pl = chData.planning, g = pl.groupes[pgSel.g];
+    if (pgPending === pgTempSel(pl)) { pgPending = null; pgRender(); return; }
+    chCommande('planning/temp?g=' + encodeURIComponent(g.cle) + '&i=' + pgSel.i + '&t=' + pgPending);
+  }
+  function pgReveil(sens) {
+    if (chBusy || !chData || !chData.planning) { return false; }
+    var pl = chData.planning;
+    if (pgRvPending === null) { pgRvJour = pgJour; }
+    var cur = pgRvPending !== null ? pgRvPending : (pgJour === 'weekend' ? pl.reveil.weekend : pl.reveil.semaine);
+    pgRvPending = Math.min(11 * 60, Math.max(5 * 60, cur + sens * 15));
+    pgRender();
+    if (pgRvTimer) { clearTimeout(pgRvTimer); }
+    pgRvTimer = setTimeout(pgRvEnvoi, 1500);
+    return false;
+  }
+  function pgRvEnvoi() {
+    pgRvTimer = null;
+    if (pgRvPending === null || !chData || !chData.planning) { pgRvPending = null; return; }
+    var pl = chData.planning, cur = pgRvJour === 'weekend' ? pl.reveil.weekend : pl.reveil.semaine;
+    if (pgRvPending === cur) { pgRvPending = null; pgRender(); return; }
+    chCommande('planning/reveil?j=' + pgRvJour + '&h=' + pad(Math.floor(pgRvPending / 60)) + ':' + pad(pgRvPending % 60));
+  }
+  function pgChoixJour(j) {
+    if (pgRvTimer) { clearTimeout(pgRvTimer); pgRvEnvoi(); }
+    pgJour = j;
+    pgRender();
+    return false;
+  }
+  function pgAppliquer() { if (!chBusy) { chCommande('planning/appliquer'); } return false; }
+  function pgAncien() { if (!chBusy) { chCommande('planning/ancien'); } return false; }
+  function pgOrigine() { if (!chBusy) { pgSel = null; chCommande('planning/origine'); } return false; }
+  function ouvrirProgramme() {
+    chFlush();
+    var j = new Date().getDay();
+    pgJour = j === 0 || j === 6 ? 'weekend' : 'semaine';
+    pgSel = null;
+    montrer('vue-programme');
+    pgEchelle();
+    pgRender();
+    return false;
+  }
 
   // ---- minuteur de cuisine : double-toucher l'horloge de l'accueil ----
   // mnFin = échéance (ms) quand il tourne ; mnReste = ms restants quand il est en pause

@@ -4,6 +4,7 @@
 
    usage : node test/mock.js &  puis
            NODE_PATH=$(npm root -g) node test/capture.js [url] [dossier de sortie]
+           … [url] [dossier] chauffage   (accueil, puis écrans pièces, détail et programme)
    (playwright est installé en global dans l'environnement de dev ; chromium
     dans /opt/pw-browsers) */
 'use strict';
@@ -60,10 +61,28 @@ function elargir(largeurArche) {
   }, largeurArche || 0);
 }
 
+// écrans du chauffage : on attend la première lecture du thermostat, puis on ouvre l'écran voulu
+function chauffage(code) {
+  return async page => {
+    await page.waitForFunction(() => window.chData && !window.chData.attente, null, { timeout: 15000 });
+    await page.evaluate(code);
+  };
+}
+
 (async () => {
   await attendreServeur();
   const browser = await chromium.launch();
-  await capture(browser, 'ipad-accueil', { width: 1024, height: 768 }, URL0);
+  const ipad = { width: 1024, height: 768 };
+  await capture(browser, 'ipad-accueil', ipad, URL0);
+  if (process.argv[4] === 'chauffage') {
+    // node test/capture.js <url> <dossier> chauffage : seulement les écrans du chauffage
+    await capture(browser, 'ipad-chauffage-pieces', ipad, URL0, chauffage('ouvrirPieces()'));
+    await capture(browser, 'ipad-chauffage-piece', ipad, URL0, chauffage('ouvrirPieces(); ouvrirPiece(3)'));
+    await capture(browser, 'ipad-chauffage-programme', ipad, URL0, chauffage('ouvrirProgramme()'));
+    await capture(browser, 'ipad-chauffage-programme-semaine', ipad, URL0, chauffage('ouvrirProgramme(); pgChoixJour("semaine"); pgTouche(3, 0)'));
+    await browser.close();
+    return;
+  }
   const pi = { width: 1280, height: 800 }, urlPi = URL0 + '?kiosque';
   await capture(browser, 'pi-A-actuel', pi, urlPi);
   await capture(browser, 'pi-B-bandes-ivoire', pi, urlPi, p => p.addStyleTag({ content: 'body{background:#f6f1e8}' }));
